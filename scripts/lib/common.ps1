@@ -285,7 +285,7 @@ function New-HtmlReport {
             default  { 'rv' }
         }
         $flags = if ($_.ReviewFlags) { "<span class='flag'>$($_.ReviewFlags)</span>" } else { '' }
-        $sav   = if ($_.Track -notin @('NONE') -and $_.EstSavingsPct) { "~$($_.EstSavingsPct)%" } else { '&mdash;' }
+        $sav   = if ($_.Track -notin @('NONE') -and $_.EstSavingsPct) { "~$($_.EstSavingsPct)%" } else { '-' }
         @"
 <tr class='$cls'>
   <td>$($_.Name)</td><td>$($_.OsType)</td><td>$($_.CurrentSize)</td>
@@ -322,7 +322,7 @@ function New-HtmlReport {
 </style></head><body>
 <header>
  <h1>Azure VM Modernization Assessment</h1>
- <p>Generated $gen &nbsp;|&nbsp; Tenant $($Account.tenantId) &nbsp;|&nbsp; Read-only &mdash; no changes were made</p>
+ <p>Generated $gen &nbsp;|&nbsp; Tenant $($Account.tenantId) &nbsp;|&nbsp; Read-only, no changes were made</p>
 </header>
 <div class='wrap'>
  <div class='cards'>
@@ -349,7 +349,7 @@ function New-HtmlReport {
   </tbody>
  </table>
  <h2>All VMs</h2>
- <div class='note'>Est. saving is indicative list-price guidance (source series &rarr; target series), not a quote &mdash; validate against your actual pricing/reservations. For very large fleets the companion <b>CSV</b> is the authoritative, filterable artifact.</div>
+ <div class='note'>Est. saving is indicative list-price guidance (source series &rarr; target series), not a quote, validate against your actual pricing/reservations. For very large fleets the companion <b>CSV</b> is the authoritative, filterable artifact.</div>
  <table>
   <thead><tr>
    <th>VM</th><th>OS</th><th>Current size</th><th>Series</th><th>Gen</th>

@@ -1,11 +1,11 @@
-# Track A — In‑place resize (Gen2, older series)
+# Track A: In-place resize (Gen2, older series)
 
-**When:** the VM is **already Gen2** but on an older series (`v1`–`v4`). You resize it in
+**When:** the VM is **already Gen2** but on an older series (`v1`-`v4`). You resize it in
 place to the modern equivalent (e.g. `Standard_D8s_v4` → `Standard_D8s_v6`).
 
-**Downtime:** minutes — the VM restarts during the resize.
+**Downtime:** minutes, the VM restarts during the resize.
 
-> Do **Wave 0 (pilot)** first. Validate on one non‑prod VM before batching.
+> Do **Wave 0 (pilot)** first. Validate on one non-prod VM before batching.
 
 ---
 
@@ -14,7 +14,7 @@ place to the modern equivalent (e.g. `Standard_D8s_v4` → `Standard_D8s_v6`).
 - **Contributor** on the VM (or a custom role with `Microsoft.Compute/virtualMachines/write`).
 - The VM's **region and quota** support the target size.
 - If the target is **v6/v7**: the **guest OS supports NVMe** (see
-  [05 – Concepts](../05-concepts.md)).
+  [05 - Concepts](../05-concepts.md)).
 - A booked **change window** and the workload owner informed.
 
 Set variables (fill these in):
@@ -25,7 +25,7 @@ $vm     = "<vm-name>"
 $target = "<Standard_..._v6>"   # from the report's "Recommended target"
 ```
 
-## 1. Confirm the target is available in the region ✅ read‑only
+## 1. Confirm the target is available in the region ✅ read-only
 
 ```powershell
 az vm list-skus --location (az vm show -g $rg -n $vm --query location -o tsv) `
@@ -35,7 +35,7 @@ az vm list-skus --location (az vm show -g $rg -n $vm --query location -o tsv) `
 If nothing returns, use the **fallback** from `config/sku-map.json` (usually the v5 size) or
 pick another supported size.
 
-## 2. Check quota for the target family ✅ read‑only
+## 2. Check quota for the target family ✅ read-only
 
 ```powershell
 az vm list-usage --location (az vm show -g $rg -n $vm --query location -o tsv) `
@@ -44,10 +44,10 @@ az vm list-usage --location (az vm show -g $rg -n $vm --query location -o tsv) `
 
 Request an increase if the family is near its limit **before** you proceed.
 
-## 3. (v6/v7 only) Verify NVMe OS support ✅ read‑only
+## 3. (v6/v7 only) Verify NVMe OS support ✅ read-only
 
 Confirm the guest OS has NVMe drivers (recent Windows Server / modern Linux kernel). If in
-doubt, **test on the pilot VM** — a missing driver means the VM won't boot after resize.
+doubt, **test on the pilot VM**: a missing driver means the VM won't boot after resize.
 
 ## 4. Snapshot the OS (and data) disks ⚠️ change (safe / additive)
 
@@ -69,7 +69,7 @@ Azure stops, resizes, and restarts the VM.
 ## 6. Validate ✅
 
 - VM shows **running**: `az vm get-instance-view -g $rg -n $vm --query "instanceView.statuses[?starts_with(code,'PowerState')].displayStatus" -o tsv`
-- **OS boots**, services start, and the **application is smoke‑tested** by the owner.
+- **OS boots**, services start, and the **application is smoke-tested** by the owner.
 
 ## 7. Rollback (only if validation fails)
 
