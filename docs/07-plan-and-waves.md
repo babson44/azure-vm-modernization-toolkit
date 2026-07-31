@@ -9,8 +9,21 @@ instead of all at once.
 ./scripts/plan.ps1 -AssessmentCsv ./reports/assessment-<timestamp>.csv
 ```
 
-This reads the approved CSV and writes `reports/plan-<timestamp>.csv` with a **Wave** column,
-plus a console summary.
+Replace `<timestamp>` with your real file name, run `ls ./reports` to see it (for example
+`assessment-20260731-174256.csv`). The assessment prints the exact command, with the real
+path filled in, when it finishes, so the easiest path is to copy that line.
+
+This reads the approved CSV and writes two artifacts to `reports/`:
+
+- **`plan-<timestamp>.html`** - a single page with two tabs: an **Assessment** tab (every VM
+  that was scanned) and a **Wave plan** tab (the batches below). Open it in a browser to review
+  and share. In Cloud Shell it is offered to your browser as a download automatically, or add
+  `-Serve` to view it rendered through the **Web preview** button. Same options as the
+  assessment, see **[03 - Run the assessment](03-run-assessment.md)**.
+- **`plan-<timestamp>.csv`** - the same VMs with a **Wave** column, the authoritative,
+  filterable artifact for large fleets.
+
+A console summary of the waves is printed as well. Nothing in your environment is changed.
 
 ## How VMs are grouped
 

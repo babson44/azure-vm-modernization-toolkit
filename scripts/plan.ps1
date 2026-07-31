@@ -19,11 +19,22 @@
 param(
     [Parameter(Mandatory)]
     [string] $AssessmentCsv,
-    [string] $OutputDir = (Join-Path (Split-Path $PSScriptRoot -Parent) 'reports')
+    [string] $OutputDir = (Join-Path (Split-Path $PSScriptRoot -Parent) 'reports'),
+
+    # Serve the finished report over a local web server for in-browser (Web preview) viewing.
+    [switch] $Serve,
+
+    # Port to serve on when -Serve is used.
+    [int]    $Port = 8080,
+
+    # Skip the automatic browser download of the HTML report in Cloud Shell.
+    [switch] $NoDownload
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+. (Join-Path $PSScriptRoot 'lib' 'common.ps1')
 
 if (-not (Test-Path $AssessmentCsv)) { throw "Assessment CSV not found: $AssessmentCsv" }
 
@@ -96,9 +107,19 @@ $planned += (& $tag $review 'ManualReview')
 $planned | Select-Object Wave, Track, TrackName, Name, CurrentSize, Target, Series, Generation, Location, Prerequisites, ReviewFlags |
     Export-Csv -Path $planPath -NoTypeInformation -Encoding utf8
 
+# Combined, tabbed HTML: Assessment tab + Wave plan tab on one page.
+$planHtml = Join-Path $OutputDir "plan-$stamp.html"
+New-PlanHtmlReport -Rows $rows -Pilot $pilot -Wave1 $wave1 -Wave2 $wave2 -Review $review -Path $planHtml -Account $null
+
 Write-Host ""
-Write-Host ("Wave plan written: {0}" -f $planPath) -ForegroundColor Green
+Write-Host "Wave plan written:" -ForegroundColor Green
+Write-Host ("  HTML (Assessment + Plan tabs): {0}" -f $planHtml)
+Write-Host ("  CSV:                           {0}" -f $planPath)
 Write-Host ""
 Write-Host "Next: open the matching track runbook for each wave in docs/tracks/ and" -ForegroundColor Cyan
 Write-Host "execute during an approved change window, snapshotting each VM first." -ForegroundColor Cyan
+
+# Make the report effortless to open (auto-download in Cloud Shell, or -Serve to view rendered).
+# Kept last because -Serve blocks while the preview server runs.
+Show-ReportAccess -HtmlPath $planHtml -CsvPath $planPath -Serve:$Serve -Port $Port -NoDownload:$NoDownload
 Write-Host ""

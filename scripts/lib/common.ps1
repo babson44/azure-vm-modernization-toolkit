@@ -241,18 +241,50 @@ function ConvertTo-Assessment {
     return $rows
 }
 
-function New-HtmlReport {
-    param(
-        [object[]] $Rows,
-        [string]   $Path,
-        [object]   $Account
-    )
+function Get-ReportCss {
+    # Single source of truth for report styling, shared by the assessment-only page
+    # and the combined assessment+plan page.
+    @"
+<style>
+ body{font-family:Segoe UI,Arial,sans-serif;margin:0;color:#1b1b1b;background:#faf9f8}
+ header{background:#0078d4;color:#fff;padding:20px 32px}
+ header h1{margin:0;font-size:22px} header p{margin:4px 0 0;opacity:.9;font-size:13px}
+ .wrap{padding:24px 32px}
+ .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+ .card{background:#fff;border:1px solid #edebe9;border-radius:8px;padding:14px 18px;min-width:96px;text-align:center}
+ .big{font-size:26px;font-weight:600} .lbl{font-size:12px;color:#605e5c}
+ table{border-collapse:collapse;width:100%;background:#fff;font-size:13px}
+ th,td{border:1px solid #edebe9;padding:7px 9px;text-align:left;vertical-align:top}
+ th{background:#f3f2f1;position:sticky;top:0}
+ tr.ok{background:#f3faf3} tr.ta{background:#f3f8ff} tr.tb{background:#fff8f0}
+ tr.tc{background:#fbf3ff} tr.td{background:#fff3f3} tr.rv{background:#fffbe6}
+ .flag{display:inline-block;background:#fde7e9;color:#a4262c;border-radius:4px;padding:1px 6px;margin-left:4px;font-size:11px}
+ .mono{font-family:Consolas,monospace;font-size:12px} .sav{text-align:right;color:#107c10;font-weight:600}
+ h2{font-size:15px;margin:22px 0 8px} .sub-table{max-width:760px}
+ .note{font-size:12px;color:#605e5c;background:#f3f2f1;border-left:3px solid #0078d4;padding:8px 12px;margin:12px 0}
+ .legend{font-size:12px;color:#605e5c;margin:14px 0}
+ code{background:#f3f2f1;padding:1px 5px;border-radius:3px}
+ .tabs{display:flex;gap:4px;border-bottom:2px solid #0078d4;padding:0 32px}
+ .tab{background:#edebe9;border:1px solid #edebe9;border-bottom:none;border-radius:8px 8px 0 0;padding:9px 22px;cursor:pointer;font-size:14px;font-weight:600;color:#605e5c;user-select:none}
+ .tab.active{background:#fff;color:#0078d4}
+ .panel{display:none} .panel.active{display:block}
+ .wave{background:#fff;border:1px solid #edebe9;border-radius:8px;margin:16px 0;overflow:hidden}
+ .wave-h{padding:10px 16px;font-weight:600;font-size:14px;color:#fff}
+ .w0{background:#107c10} .w1{background:#0078d4} .w2{background:#5c2d91} .wr{background:#a4262c}
+ .wave .empty{padding:12px 16px;color:#605e5c;font-size:13px}
+</style>
+"@
+}
+
+function Get-AssessmentBodyHtml {
+    # Returns the inner HTML for the assessment view (cards, per-subscription rollup,
+    # full VM table). Shared by both the assessment page and the combined page.
+    param([object[]] $Rows)
 
     $total      = $Rows.Count
     $candidates = @($Rows | Where-Object { $_.Track -notin @('NONE') }).Count
     $modern     = @($Rows | Where-Object { $_.Track -eq 'NONE' }).Count
     $byTrack    = $Rows | Group-Object Track | Sort-Object Name
-    $gen        = (Get-Date).ToString('u')
 
     # Weighted-average list-price saving across candidate VMs (guidance only).
     $savRows = @($Rows | Where-Object { $_.Track -notin @('NONE') -and $_.EstSavingsPct })
@@ -297,34 +329,7 @@ function New-HtmlReport {
 "@
     }) -join "`n"
 
-    $html = @"
-<!doctype html><html><head><meta charset='utf-8'>
-<title>Azure VM Modernization Assessment</title>
-<style>
- body{font-family:Segoe UI,Arial,sans-serif;margin:0;color:#1b1b1b;background:#faf9f8}
- header{background:#0078d4;color:#fff;padding:20px 32px}
- header h1{margin:0;font-size:22px} header p{margin:4px 0 0;opacity:.9;font-size:13px}
- .wrap{padding:24px 32px}
- .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
- .card{background:#fff;border:1px solid #edebe9;border-radius:8px;padding:14px 18px;min-width:96px;text-align:center}
- .big{font-size:26px;font-weight:600} .lbl{font-size:12px;color:#605e5c}
- table{border-collapse:collapse;width:100%;background:#fff;font-size:13px}
- th,td{border:1px solid #edebe9;padding:7px 9px;text-align:left;vertical-align:top}
- th{background:#f3f2f1;position:sticky;top:0}
- tr.ok{background:#f3faf3} tr.ta{background:#f3f8ff} tr.tb{background:#fff8f0}
- tr.tc{background:#fbf3ff} tr.td{background:#fff3f3} tr.rv{background:#fffbe6}
- .flag{display:inline-block;background:#fde7e9;color:#a4262c;border-radius:4px;padding:1px 6px;margin-left:4px;font-size:11px}
- .mono{font-family:Consolas,monospace;font-size:12px} .sav{text-align:right;color:#107c10;font-weight:600}
- h2{font-size:15px;margin:22px 0 8px} .sub-table{max-width:760px}
- .note{font-size:12px;color:#605e5c;background:#f3f2f1;border-left:3px solid #0078d4;padding:8px 12px;margin:12px 0}
- .legend{font-size:12px;color:#605e5c;margin:14px 0}
- code{background:#f3f2f1;padding:1px 5px;border-radius:3px}
-</style></head><body>
-<header>
- <h1>Azure VM Modernization Assessment</h1>
- <p>Generated $gen &nbsp;|&nbsp; Tenant $($Account.tenantId) &nbsp;|&nbsp; Read-only, no changes were made</p>
-</header>
-<div class='wrap'>
+    @"
  <div class='cards'>
    <div class='card'><div class='big'>$total</div><div class='lbl'>VMs scanned</div></div>
    <div class='card'><div class='big'>$candidates</div><div class='lbl'>Candidates</div></div>
@@ -359,7 +364,149 @@ function New-HtmlReport {
   $bodyRows
   </tbody>
  </table>
+"@
+}
+
+function New-HtmlReport {
+    param(
+        [object[]] $Rows,
+        [string]   $Path,
+        [object]   $Account
+    )
+
+    $gen    = (Get-Date).ToString('u')
+    $css    = Get-ReportCss
+    $body   = Get-AssessmentBodyHtml -Rows $Rows
+    $tenant = if ($Account) { $Account.tenantId } else { 'n/a' }
+
+    $html = @"
+<!doctype html><html><head><meta charset='utf-8'>
+<title>Azure VM Modernization Assessment</title>
+$css</head><body>
+<header>
+ <h1>Azure VM Modernization Assessment</h1>
+ <p>Generated $gen &nbsp;|&nbsp; Tenant $tenant &nbsp;|&nbsp; Read-only, no changes were made</p>
+</header>
+<div class='wrap'>
+$body
 </div></body></html>
+"@
+
+    $html | Out-File -FilePath $Path -Encoding utf8
+}
+
+function Get-PlanBodyHtml {
+    # Returns the inner HTML for the wave-plan view: summary cards plus one styled
+    # section per wave (and the manual-review bucket).
+    param(
+        [object[]] $Rows,
+        [object[]] $Pilot,
+        [object[]] $Wave1,
+        [object[]] $Wave2,
+        [object[]] $Review
+    )
+
+    $mkRows = {
+        param($items)
+        (@($items) | Sort-Object Track, Name | ForEach-Object {
+            $cls = switch ($_.Track) { 'A' { 'ta' } 'B' { 'tb' } 'C' { 'tc' } 'D' { 'td' } default { 'rv' } }
+            $flags = if ($_.ReviewFlags) { "<span class='flag'>$($_.ReviewFlags)</span>" } else { '' }
+            "<tr class='$cls'><td>$($_.Name)</td><td><b>$($_.Track)</b> $($_.TrackName)</td><td>$($_.CurrentSize)</td><td>$($_.Target)</td><td>$($_.Series)</td><td>$($_.Generation)</td><td>$($_.Location)</td><td>$($_.Prerequisites) $flags</td></tr>"
+        }) -join "`n"
+    }
+
+    $waveSection = {
+        param($title, $cls, $items, $empty)
+        $n = @($items).Count
+        if ($n -eq 0) {
+            $inner = "<div class='empty'>$empty</div>"
+        }
+        else {
+            $inner = "<table><thead><tr><th>VM</th><th>Track</th><th>Current size</th><th>Target</th><th>Series</th><th>Gen</th><th>Region</th><th>Prerequisites / flags</th></tr></thead><tbody>$(& $mkRows $items)</tbody></table>"
+        }
+        "<div class='wave'><div class='wave-h $cls'>$title &nbsp;($n VMs)</div>$inner</div>"
+    }
+
+    $candidates = @($Rows | Where-Object { $_.Track -notin @('NONE') }).Count
+    $w0 = @($Pilot).Count; $w1 = @($Wave1).Count; $w2 = @($Wave2).Count; $rv = @($Review).Count
+
+    $s0 = & $waveSection 'Wave 0 - Pilot (validate the runbook here first)'    'w0' $Pilot  'No pilot VMs.'
+    $s1 = & $waveSection 'Wave 1 - Non-production'                             'w1' $Wave1  'No non-production VMs to batch.'
+    $s2 = & $waveSection 'Wave 2 - Production (smallest blast radius first)'    'w2' $Wave2  'No production VMs to batch.'
+    $sr = & $waveSection 'Manual review - do NOT batch'                        'wr' $Review 'Nothing needs manual review.'
+
+    @"
+ <div class='cards'>
+   <div class='card'><div class='big'>$candidates</div><div class='lbl'>Candidates</div></div>
+   <div class='card'><div class='big'>$w0</div><div class='lbl'>Wave 0 Pilot</div></div>
+   <div class='card'><div class='big'>$w1</div><div class='lbl'>Wave 1 Non-prod</div></div>
+   <div class='card'><div class='big'>$w2</div><div class='lbl'>Wave 2 Prod</div></div>
+   <div class='card'><div class='big'>$rv</div><div class='lbl'>Manual review</div></div>
+ </div>
+ <div class='note'>Roll out one wave at a time: prove the track runbook on the pilot, then non-production, then production. Snapshot every VM before you touch it and work inside an approved change window. This plan makes no changes by itself.</div>
+ $s0
+ $s1
+ $s2
+ $sr
+ <div class='legend'>Next: open the matching runbook in <code>docs/tracks/</code> for each VM's track and execute it wave by wave. Track <code>A</code> = in-place resize, <code>B</code> = Gen1&rarr;Gen2 then resize, <code>C</code> = AVD image-replace, <code>D</code> = rebuild.</div>
+"@
+}
+
+function New-PlanHtmlReport {
+    # Writes a single page with two tabs: the assessment (all scanned VMs) and the
+    # wave plan. No external assets, so it renders fine after a browser download.
+    param(
+        [object[]] $Rows,
+        [object[]] $Pilot,
+        [object[]] $Wave1,
+        [object[]] $Wave2,
+        [object[]] $Review,
+        [string]   $Path,
+        [object]   $Account
+    )
+
+    $gen   = (Get-Date).ToString('u')
+    $css   = Get-ReportCss
+    $aBody = Get-AssessmentBodyHtml -Rows $Rows
+    $pBody = Get-PlanBodyHtml -Rows $Rows -Pilot $Pilot -Wave1 $Wave1 -Wave2 $Wave2 -Review $Review
+    $meta  = if ($Account) {
+        "Generated $gen &nbsp;|&nbsp; Tenant $($Account.tenantId) &nbsp;|&nbsp; Read-only, no changes were made"
+    }
+    else {
+        "Generated $gen &nbsp;|&nbsp; Read-only, no changes were made"
+    }
+
+    $html = @"
+<!doctype html><html><head><meta charset='utf-8'>
+<title>Azure VM Modernization - Assessment and Plan</title>
+$css</head><body>
+<header>
+ <h1>Azure VM Modernization - Assessment &amp; Plan</h1>
+ <p>$meta</p>
+</header>
+<div class='tabs'>
+ <div class='tab active' onclick="showTab('tab-assess',this)">Assessment</div>
+ <div class='tab' onclick="showTab('tab-plan',this)">Wave plan</div>
+</div>
+<div class='wrap'>
+ <div id='tab-assess' class='panel active'>
+$aBody
+ </div>
+ <div id='tab-plan' class='panel'>
+$pBody
+ </div>
+</div>
+<script>
+function showTab(id, btn){
+  var ps = document.querySelectorAll('.panel');
+  for (var i = 0; i < ps.length; i++){ ps[i].classList.remove('active'); }
+  var ts = document.querySelectorAll('.tab');
+  for (var j = 0; j < ts.length; j++){ ts[j].classList.remove('active'); }
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body></html>
 "@
 
     $html | Out-File -FilePath $Path -Encoding utf8
