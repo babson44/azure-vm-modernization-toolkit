@@ -55,7 +55,7 @@ flowchart TD
 
 ---
 
-## 60-second start (Azure Cloud Shell, recommended)
+## Fastest path (Azure Cloud Shell, recommended)
 
 No installation. Works in any browser. You're already signed in.
 
@@ -66,25 +66,90 @@ No installation. Works in any browser. You're already signed in.
    iwr https://raw.githubusercontent.com/babson44/azure-vm-modernization-toolkit/main/bootstrap.ps1 | iex
    ```
 
-3. **Your report opens itself.** When the scan finishes in Cloud Shell, the HTML report
-   is **automatically sent to your browser's downloads**, just open the downloaded file.
+   This runs the **assessment and the wave plan in one shot** and writes a single
+   report with two tabs (**Assessment** + **Wave plan**).
 
-   Want to see it rendered *without* downloading? Run it with `-Serve` and click the
-   **Web preview** button in the Cloud Shell toolbar:
-
-   ```powershell
-   iwr https://raw.githubusercontent.com/babson44/azure-vm-modernization-toolkit/main/bootstrap.ps1 -OutFile bootstrap.ps1
-   ./bootstrap.ps1        # auto-downloads the report
-   # or, to view it live in the browser instead:
-   ./azure-vm-modernization-toolkit/scripts/assess.ps1 -Serve
-   ```
-
-   The scan also always prints copy-paste `download ...` commands and a **Manage files >
-   Download** tip, so you are never stuck. Full walkthrough with pictures-in-words:
-   **[docs/03-run-assessment.md](docs/03-run-assessment.md)**.
+3. **Your report opens itself.** When it finishes, the HTML report is **automatically
+   sent to your browser's downloads**, just open the downloaded file. Want it rendered
+   *without* downloading? Add `-Serve` (see below) and click the **Web preview** button
+   in the Cloud Shell toolbar.
 
 That's it. New to Cloud Shell? Follow the zero-assumptions guide:
 **[docs/01-open-cloud-shell.md](docs/01-open-cloud-shell.md)**.
+
+Everything here is **read-only**. It never changes, stops, or deletes anything.
+
+---
+
+## The two steps, explained
+
+The one-liner above does both of these for you. If you'd rather run them yourself, or
+you want a person to review the assessment **before** a plan is produced, run them
+separately. Both are read-only.
+
+First get the toolkit (once):
+
+```powershell
+git clone https://github.com/babson44/azure-vm-modernization-toolkit ~/azure-vm-modernization-toolkit
+cd ~/azure-vm-modernization-toolkit
+```
+
+### Step 1 - Assess (what do I have, and where should each VM go?)
+
+Scans **every subscription you can read** in one pass, routes each VM through the
+decision tree, and tells you, per VM: current size and generation, the recommended
+**target** size, what has to happen first, and an estimated monthly **saving**. It
+produces an **assessment report** (HTML + CSV).
+
+```powershell
+./scripts/assess.ps1
+```
+
+The assessment answers **"what and where."** Review it, then move on.
+
+### Step 2 - Plan (in what order do I roll this out safely?)
+
+Takes the assessment and groups the candidates into **rollout waves** so you never
+change the whole fleet at once:
+
+- **Wave 0 - Pilot:** a couple of low-risk VMs per track. Prove the runbook here first.
+- **Wave 1 - Non-production**
+- **Wave 2 - Production**, smallest blast radius first.
+- **Manual review:** VMs with encryption, zone/availability-set pinning, or specialized
+  SKUs that a human must map before batching.
+
+The plan answers **"in what order, and in what batches."** That sequencing is the value
+it adds on top of the assessment. Pass the assessment CSV that Step 1 wrote:
+
+```powershell
+./scripts/plan.ps1 -AssessmentCsv ./reports/assessment-<timestamp>.csv
+```
+
+> `<timestamp>` is a **placeholder**. Use the real file name Step 1 printed, for example
+> `assessment-20260731-174256.csv`. Tip: `ls ./reports` shows it, or let tab-completion
+> fill it in.
+
+The plan writes the same two-tab HTML (**Assessment** + **Wave plan**) plus a plan CSV.
+
+### Prefer one command?
+
+`run.ps1` is exactly Step 1 + Step 2 back to back, with one combined report:
+
+```powershell
+./scripts/run.ps1
+```
+
+### Viewing the report without downloading
+
+Any of the three scripts accepts `-Serve` to host the finished report locally so you can
+open it, fully rendered, from the Cloud Shell **Web preview** button:
+
+```powershell
+./scripts/run.ps1 -Serve          # or assess.ps1 -Serve / plan.ps1 ... -Serve
+```
+
+Full walkthrough with pictures-in-words:
+**[docs/03-run-assessment.md](docs/03-run-assessment.md)**.
 
 ---
 

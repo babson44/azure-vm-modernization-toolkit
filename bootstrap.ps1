@@ -5,9 +5,10 @@
     Usage (paste into Cloud Shell > PowerShell):
         iwr https://raw.githubusercontent.com/babson44/azure-vm-modernization-toolkit/main/bootstrap.ps1 | iex
 
-    It downloads this toolkit to a temp folder, runs the READ-ONLY assessment across
-    every subscription you can read, and copies the report into ./reports in your
-    current Cloud Shell directory. It changes nothing in Azure.
+    It downloads this toolkit to your home folder, runs the READ-ONLY assess + plan
+    across every subscription you can read in one shot, and writes a combined report
+    (Assessment + Wave plan tabs) into ./reports in your current Cloud Shell directory.
+    It changes nothing in Azure.
 #>
 
 Set-StrictMode -Version Latest
@@ -43,9 +44,9 @@ if (-not (Test-Path (Join-Path $tk 'scripts' 'assess.ps1'))) {
     if ($inner) { Move-Item $inner.FullName $tk -Force }
 }
 
-$assess = Join-Path $tk 'scripts' 'assess.ps1'
-if (-not (Test-Path $assess)) { throw "Could not locate assess.ps1 after download." }
+$run = Join-Path $tk 'scripts' 'run.ps1'
+if (-not (Test-Path $run)) { throw "Could not locate run.ps1 after download." }
 
 # Reports go into ./reports in your current folder, so 'download reports/...' works from here.
 $localReports = Join-Path (Get-Location) 'reports'
-& $assess -OutputDir $localReports
+& $run -OutputDir $localReports

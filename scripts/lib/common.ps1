@@ -395,6 +395,52 @@ $body
     $html | Out-File -FilePath $Path -Encoding utf8
 }
 
+function Split-VmWaves {
+    # Single source of truth for wave bucketing. Takes assessment rows and returns the
+    # pilot / non-prod / prod / manual-review buckets. Used by both plan.ps1 and run.ps1
+    # so the console output, CSV, and HTML always agree. Makes no changes.
+    param([object[]] $Rows)
+
+    $work   = @($Rows | Where-Object { $_.Track -notin @('NONE') })
+    $review = @($work | Where-Object { $_.ReviewFlags -or $_.Track -eq 'REVIEW' })
+    $batch  = @($work | Where-Object { -not $_.ReviewFlags -and $_.Track -ne 'REVIEW' })
+
+    $isNonProd = {
+        param($vm)
+        (@($vm.Name, $vm.ResourceGroup) -join ' ') -match '(?i)dev|test|qa|stg|stage|uat|sandbox|nonprod|non-prod|poc'
+    }
+
+    $nonprod = @($batch | Where-Object { & $isNonProd $_ })
+    $prod    = @($batch | Where-Object { -not (& $isNonProd $_) })
+
+    # Pilot = up to 2 per track from non-prod (fallback to prod if no non-prod exists).
+    $pilotPool  = if ($nonprod.Count -gt 0) { $nonprod } else { $prod }
+    $pilot      = @($pilotPool | Group-Object Track | ForEach-Object { $_.Group | Select-Object -First 2 })
+    $pilotNames = @($pilot.Name)
+
+    $wave1 = @($nonprod | Where-Object { $_.Name -notin $pilotNames })
+    $wave2 = @($prod    | Where-Object { $_.Name -notin $pilotNames } | Sort-Object Track, Location)
+
+    [pscustomobject]@{ Pilot = $pilot; Wave1 = $wave1; Wave2 = $wave2; Review = $review }
+}
+
+function Export-WavePlanCsv {
+    # Writes the wave plan to CSV with a Wave column. Shared by plan.ps1 and run.ps1.
+    param([object] $Waves, [string] $Path)
+
+    $tag = {
+        param($items, $wave)
+        $items | ForEach-Object { $_ | Add-Member -NotePropertyName Wave -NotePropertyValue $wave -Force -PassThru }
+    }
+    $planned = @()
+    $planned += (& $tag $Waves.Pilot  'Wave0-Pilot')
+    $planned += (& $tag $Waves.Wave1  'Wave1-NonProd')
+    $planned += (& $tag $Waves.Wave2  'Wave2-Prod')
+    $planned += (& $tag $Waves.Review 'ManualReview')
+    $planned | Select-Object Wave, Track, TrackName, Name, CurrentSize, Target, Series, Generation, Location, Prerequisites, ReviewFlags |
+        Export-Csv -Path $Path -NoTypeInformation -Encoding utf8
+}
+
 function Get-PlanBodyHtml {
     # Returns the inner HTML for the wave-plan view: summary cards plus one styled
     # section per wave (and the manual-review bucket).

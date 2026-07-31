@@ -50,25 +50,12 @@ if ($work.Count -eq 0) {
     return
 }
 
-# Split off anything needing a human before it can be batched.
-$review = @($work | Where-Object { $_.ReviewFlags -or $_.Track -eq 'REVIEW' })
-$batchable = @($work | Where-Object { -not $_.ReviewFlags -and $_.Track -ne 'REVIEW' })
-
-function Test-NonProd {
-    param($vm)
-    return (@($vm.Name, $vm.ResourceGroup) -join ' ') -match '(?i)dev|test|qa|stg|stage|uat|sandbox|nonprod|non-prod|poc'
-}
-
-$nonprod = @($batchable | Where-Object { Test-NonProd $_ })
-$prod    = @($batchable | Where-Object { -not (Test-NonProd $_) })
-
-# Pilot = up to 2 per track from non-prod (fallback to prod if no non-prod exists).
-$pilotPool = if ($nonprod.Count -gt 0) { $nonprod } else { $prod }
-$pilot = $pilotPool | Group-Object Track | ForEach-Object { $_.Group | Select-Object -First 2 }
-$pilotNames = $pilot.Name
-
-$wave1 = @($nonprod | Where-Object { $_.Name -notin $pilotNames })
-$wave2 = @($prod    | Where-Object { $_.Name -notin $pilotNames } | Sort-Object Track, Location)
+# Bucket the fleet into waves (shared logic, so console/CSV/HTML always agree).
+$waves  = Split-VmWaves -Rows $rows
+$pilot  = $waves.Pilot
+$wave1  = $waves.Wave1
+$wave2  = $waves.Wave2
+$review = $waves.Review
 
 function Write-Wave {
     param([string]$Title, [object[]]$Items)
@@ -95,17 +82,7 @@ if (-not (Test-Path $OutputDir)) { New-Item -ItemType Directory -Path $OutputDir
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $planPath = Join-Path $OutputDir "plan-$stamp.csv"
 
-$tag = {
-    param($items,$wave)
-    $items | ForEach-Object { $_ | Add-Member -NotePropertyName Wave -NotePropertyValue $wave -Force -PassThru }
-}
-$planned = @()
-$planned += (& $tag $pilot  'Wave0-Pilot')
-$planned += (& $tag $wave1  'Wave1-NonProd')
-$planned += (& $tag $wave2  'Wave2-Prod')
-$planned += (& $tag $review 'ManualReview')
-$planned | Select-Object Wave, Track, TrackName, Name, CurrentSize, Target, Series, Generation, Location, Prerequisites, ReviewFlags |
-    Export-Csv -Path $planPath -NoTypeInformation -Encoding utf8
+Export-WavePlanCsv -Waves $waves -Path $planPath
 
 # Combined, tabbed HTML: Assessment tab + Wave plan tab on one page.
 $planHtml = Join-Path $OutputDir "plan-$stamp.html"
