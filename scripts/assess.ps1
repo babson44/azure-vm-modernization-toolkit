@@ -85,7 +85,8 @@ Write-Host ("  HTML: {0}" -f $htmlPath)
 Write-Host ("  CSV:  {0}" -f $csvPath)
 Write-Host ""
 Write-Host "Next: review the report, then build a wave plan:" -ForegroundColor Cyan
-Write-Host ("  ./scripts/plan.ps1 -AssessmentCsv `"{0}`"" -f $csvPath)
+$planScript = Join-Path $PSScriptRoot 'plan.ps1'
+Write-Host ("  {0} -AssessmentCsv `"{1}`"" -f $planScript, $csvPath)
 
 # Make the report effortless to open (auto-download in Cloud Shell, or -Serve to view rendered).
 # Kept last because -Serve blocks while the preview server runs.
