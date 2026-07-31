@@ -1,0 +1,31 @@
+// inventory.kql
+// Fleet inventory for VM series modernization, across every subscription the caller
+// can read. One row per VM, enriched with its Azure VM generation (Gen1/Gen2), read
+// from the managed OS disk's hyperVGeneration property.
+//
+// NOTE: "hyperVGeneration" is the raw ARM/API field name. In all human-facing output
+// we call this the "Azure VM generation (Gen1/Gen2)".
+Resources
+| where type == "microsoft.compute/virtualmachines"
+| extend vmSize   = tostring(properties.hardwareProfile.vmSize)
+| extend ver      = extract(@"[vV]([0-9])$", 1, vmSize)
+| extend seriesVersion = iff(isempty(ver), "v1_or_classic", strcat("v", ver))
+| extend osType   = tostring(properties.storageProfile.osDisk.osType)
+| extend osDiskId = tolower(tostring(properties.storageProfile.osDisk.managedDisk.id))
+| extend powerState = tostring(properties.extended.instanceView.powerState.code)
+| extend zone     = tostring(zones[0])
+| extend avSet    = tostring(properties.availabilitySet.id)
+| extend encryption = tostring(properties.storageProfile.osDisk.encryptionSettings.enabled)
+| join kind=leftouter (
+    Resources
+    | where type == "microsoft.compute/disks"
+    | project osDiskId = tolower(id),
+              hyperVGen = tostring(properties.hyperVGeneration),
+              osSku     = tostring(sku.name)
+  ) on osDiskId
+| extend generation = iff(isempty(hyperVGen), "Gen1", replace_string(hyperVGen, "V", "Gen"))
+| project name, vmSize, seriesVersion, osType, generation,
+          location, zone, powerState, avSet, encryption, osSku,
+          resourceGroup, subscriptionId, id,
+          tags = tostring(tags)
+| order by subscriptionId asc, seriesVersion asc, vmSize asc

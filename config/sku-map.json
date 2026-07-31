@@ -1,0 +1,80 @@
+{
+  "_comment": "Maps an old VM family (regex on vmSize) to a recommended modern target. {0} is the vCPU count captured from the source size name. targetPreferred is tried first; targetFallback if preferred is unavailable in the region or on quota. prerequisites list what must be true before a resize. estSavingsPct is a ROUGH monthly saving hint (list-price direction, region-neutral) used only to prioritise - always validate with the Azure Pricing Calculator.",
+  "defaultTarget": {
+    "targetPreferred": null,
+    "targetFallback": null,
+    "prerequisites": [],
+    "estSavingsPct": 0,
+    "note": "No mapping matched - manual review required."
+  },
+  "rules": [
+    {
+      "match": "^Standard_D(\\d+)as_v[34]$",
+      "family": "Dasv (AMD general purpose)",
+      "targetPreferred": "Standard_D{0}as_v6",
+      "targetFallback": "Standard_D{0}as_v5",
+      "prerequisites": ["gen2", "nvme-os-check"],
+      "estSavingsPct": 15,
+      "note": "AMD general purpose. v6 is Gen2 + NVMe only; verify AMD NVMe drivers in the guest OS."
+    },
+    {
+      "match": "^Standard_D(\\d+)s_v[34]$",
+      "family": "Dsv (Intel general purpose)",
+      "targetPreferred": "Standard_D{0}s_v6",
+      "targetFallback": "Standard_D{0}s_v5",
+      "prerequisites": ["gen2", "nvme-os-check"],
+      "estSavingsPct": 12,
+      "note": "Intel general purpose. v6 is Gen2 + NVMe only."
+    },
+    {
+      "match": "^Standard_D(\\d+)_v[34]$",
+      "family": "Dv (Intel general purpose, no local SSD marker)",
+      "targetPreferred": "Standard_D{0}s_v6",
+      "targetFallback": "Standard_D{0}s_v5",
+      "prerequisites": ["gen2", "nvme-os-check", "premium-disk-check"],
+      "estSavingsPct": 12,
+      "note": "Dv4 -> Dsv6: newer families are 's' (premium-capable). Confirm disks are managed."
+    },
+    {
+      "match": "^Standard_E(\\d+)s_v[34]$",
+      "family": "Esv (memory optimized)",
+      "targetPreferred": "Standard_E{0}s_v6",
+      "targetFallback": "Standard_E{0}s_v5",
+      "prerequisites": ["gen2", "nvme-os-check"],
+      "estSavingsPct": 12,
+      "note": "Memory optimized."
+    },
+    {
+      "match": "^Standard_E(\\d+)as_v[34]$",
+      "family": "Easv (AMD memory optimized)",
+      "targetPreferred": "Standard_E{0}as_v6",
+      "targetFallback": "Standard_E{0}as_v5",
+      "prerequisites": ["gen2", "nvme-os-check"],
+      "estSavingsPct": 13,
+      "note": "AMD memory optimized."
+    },
+    {
+      "match": "^Standard_F(\\d+)s_v2$",
+      "family": "Fsv2 (compute optimized)",
+      "targetPreferred": "Standard_F{0}s_v6",
+      "targetFallback": "Standard_F{0}als_v6",
+      "prerequisites": ["gen2"],
+      "estSavingsPct": 10,
+      "note": "Compute optimized. Fsv6/Falsv6 are Gen2."
+    },
+    {
+      "match": "^Standard_B(\\d+)m?s$",
+      "family": "B (burstable, v1)",
+      "targetPreferred": "Standard_B{0}s_v2",
+      "targetFallback": null,
+      "prerequisites": [],
+      "estSavingsPct": 8,
+      "note": "Burstable. Bsv2 is Gen2; small footprint, low risk."
+    }
+  ],
+  "prerequisiteMeaning": {
+    "gen2": "If the VM is Gen1, an Azure VM Gen1 -> Gen2 conversion is required before resizing to this target (Track B). Gen2 VMs skip this.",
+    "nvme-os-check": "v6/v7 present disks over NVMe. Confirm the guest OS supports NVMe (recent Windows Server / Linux kernels) or it will not boot. This is the single most common migration failure.",
+    "premium-disk-check": "Target 's' families require managed (premium-capable) disks. Confirm the VM uses managed disks."
+  }
+}

@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset='utf-8'>
+<title>Azure VM Modernization Assessment (SAMPLE)</title>
+<style>
+ body{font-family:Segoe UI,Arial,sans-serif;margin:0;color:#1b1b1b;background:#faf9f8}
+ header{background:#0078d4;color:#fff;padding:20px 32px}
+ header h1{margin:0;font-size:22px} header p{margin:4px 0 0;opacity:.9;font-size:13px}
+ .wrap{padding:24px 32px}
+ .cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+ .card{background:#fff;border:1px solid #edebe9;border-radius:8px;padding:14px 18px;min-width:96px;text-align:center}
+ .big{font-size:26px;font-weight:600} .lbl{font-size:12px;color:#605e5c}
+ table{border-collapse:collapse;width:100%;background:#fff;font-size:13px}
+ th,td{border:1px solid #edebe9;padding:7px 9px;text-align:left;vertical-align:top}
+ th{background:#f3f2f1;position:sticky;top:0}
+ tr.ok{background:#f3faf3} tr.ta{background:#f3f8ff} tr.tb{background:#fff8f0}
+ tr.tc{background:#fbf3ff} tr.td{background:#fff3f3} tr.rv{background:#fffbe6}
+ .flag{display:inline-block;background:#fde7e9;color:#a4262c;border-radius:4px;padding:1px 6px;margin-left:4px;font-size:11px}
+ .legend{font-size:12px;color:#605e5c;margin:14px 0}
+ .note{background:#fff4ce;border:1px solid #f2d98d;border-radius:6px;padding:10px 14px;font-size:13px;margin-bottom:16px}
+ code{background:#f3f2f1;padding:1px 5px;border-radius:3px}
+</style></head><body>
+<header>
+ <h1>Azure VM Modernization Assessment</h1>
+ <p>Generated 2026-07-31 10:15:00Z &nbsp;|&nbsp; Tenant 00000000-0000-0000-0000-000000000000 &nbsp;|&nbsp; Read-only &mdash; no changes were made</p>
+</header>
+<div class='wrap'>
+ <div class='note'><b>This is a SAMPLE report</b> with fictional VMs, so you can see the output before running the assessment in your own tenant.</div>
+ <div class='cards'>
+   <div class='card'><div class='big'>12</div><div class='lbl'>VMs scanned</div></div>
+   <div class='card'><div class='big'>8</div><div class='lbl'>Candidates</div></div>
+   <div class='card'><div class='big'>4</div><div class='lbl'>Already modern</div></div>
+   <div class='card'><div class='big'>1</div><div class='lbl'>Track A</div></div>
+   <div class='card'><div class='big'>2</div><div class='lbl'>Track B</div></div>
+   <div class='card'><div class='big'>4</div><div class='lbl'>Track C</div></div>
+   <div class='card'><div class='big'>1</div><div class='lbl'>Track REVIEW</div></div>
+ </div>
+ <div class='legend'>
+   <b>Tracks:</b>
+   <code>A</code> in-place resize (Gen2) &middot;
+   <code>B</code> Gen1&rarr;Gen2 then resize &middot;
+   <code>C</code> AVD image-replace &middot;
+   <code>D</code> rebuild &middot;
+   <code>REVIEW</code> manual. Red chips = review flags (encryption, zone/av-set pinning, specialized SKU).
+   See <code>docs/04-decision-tree.md</code>.
+ </div>
+ <table>
+  <thead><tr>
+   <th>VM</th><th>OS</th><th>Current size</th><th>Series</th><th>Gen</th>
+   <th>Track</th><th>Recommended target</th><th>Prerequisites / flags</th><th>Region</th>
+  </tr></thead>
+  <tbody>
+   <tr class='ta'><td>app-web-01</td><td>Windows</td><td>Standard_D8s_v4</td><td>v4</td><td>Gen2</td><td><b>A</b> In-place resize</td><td>Standard_D8s_v6</td><td>nvme-os-check</td><td>eastus</td></tr>
+   <tr class='tb'><td>sql-legacy-01</td><td>Windows</td><td>Standard_E16s_v3</td><td>v3</td><td>Gen1</td><td><b>B</b> Gen1 -&gt; Gen2 then resize</td><td>Standard_E16s_v6</td><td>gen2-conversion; nvme-os-check</td><td>westeurope</td></tr>
+   <tr class='tb'><td>api-svc-02</td><td>Linux</td><td>Standard_D4s_v4</td><td>v4</td><td>Gen1</td><td><b>B</b> Gen1 -&gt; Gen2 then resize</td><td>Standard_D4s_v6</td><td>gen2-conversion; nvme-os-check</td><td>eastus</td></tr>
+   <tr class='tc'><td>avd-host-0</td><td>Windows</td><td>Standard_D32as_v4</td><td>v4</td><td>Gen1</td><td><b>C</b> AVD image-replace</td><td>Standard_D32as_v6</td><td>new-image; host-pool-drain</td><td>westeurope</td></tr>
+   <tr class='tc'><td>avd-host-1</td><td>Windows</td><td>Standard_D32as_v4</td><td>v4</td><td>Gen1</td><td><b>C</b> AVD image-replace</td><td>Standard_D32as_v6</td><td>new-image; host-pool-drain</td><td>westus2</td></tr>
+   <tr class='tc'><td>avd-host-2</td><td>Windows</td><td>Standard_D32as_v4</td><td>v4</td><td>Gen1</td><td><b>C</b> AVD image-replace</td><td>Standard_D32as_v6</td><td>new-image; host-pool-drain</td><td>eastus</td></tr>
+   <tr class='tc'><td>avd-host-3</td><td>Windows</td><td>Standard_D32as_v4</td><td>v4</td><td>Gen1</td><td><b>C</b> AVD image-replace</td><td>Standard_D32as_v6</td><td>new-image; host-pool-drain</td><td>southeastasia</td></tr>
+   <tr class='rv'><td>gpu-render-01</td><td>Linux</td><td>Standard_NC6s_v3</td><td>v3</td><td>Gen1</td><td><b>REVIEW</b> Manual review</td><td></td><td>specialized-sku <span class='flag'>specialized-sku</span></td><td>eastus</td></tr>
+   <tr class='ok'><td>web-modern-01</td><td>Linux</td><td>Standard_D4s_v5</td><td>v5</td><td>Gen2</td><td><b>NONE</b> Already modern</td><td></td><td></td><td>eastus</td></tr>
+   <tr class='ok'><td>web-modern-02</td><td>Linux</td><td>Standard_D4s_v5</td><td>v5</td><td>Gen2</td><td><b>NONE</b> Already modern</td><td></td><td></td><td>eastus</td></tr>
+   <tr class='ok'><td>cache-01</td><td>Linux</td><td>Standard_E8s_v5</td><td>v5</td><td>Gen2</td><td><b>NONE</b> Already modern</td><td></td><td></td><td>westeurope</td></tr>
+   <tr class='ok'><td>batch-01</td><td>Windows</td><td>Standard_D16s_v5</td><td>v5</td><td>Gen2</td><td><b>NONE</b> Already modern</td><td></td><td></td><td>westus2</td></tr>
+  </tbody>
+ </table>
+</div></body></html>

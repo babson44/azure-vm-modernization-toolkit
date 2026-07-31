@@ -1,0 +1,15 @@
+# Generated reports and local state
+reports/
+*.csv
+*.html
+!samples/*.html
+
+# Azure / auth
+.azure/
+*.azcli
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+*.log
