@@ -364,3 +364,84 @@ function New-HtmlReport {
 
     $html | Out-File -FilePath $Path -Encoding utf8
 }
+
+function Test-CloudShell {
+    # True when running inside the browser-based Azure Cloud Shell, where the special
+    # `download` command (browser file download) is available.
+    if ($env:AZUREPS_HOST_ENVIRONMENT -and $env:AZUREPS_HOST_ENVIRONMENT -match 'cloud-shell') { return $true }
+    if ($env:ACC_CLOUD) { return $true }
+    if (Get-Command download -ErrorAction SilentlyContinue) { return $true }
+    return $false
+}
+
+function Show-ReportAccess {
+    <#
+        Makes the finished report effortless to view, so a non-technical customer does
+        nothing extra:
+          - In Cloud Shell it auto-triggers the browser download of the HTML report.
+          - With -Serve it starts a tiny local web server so the report opens fully
+            rendered through the Cloud Shell "Web preview" button (a clickable page).
+        It always prints copy-paste fallbacks so no one is ever stuck.
+        This function is read-only and never changes anything in Azure.
+    #>
+    param(
+        [Parameter(Mandatory)] [string] $HtmlPath,
+        [Parameter(Mandatory)] [string] $CsvPath,
+        [switch] $Serve,
+        [int]    $Port = 8080,
+        [switch] $NoDownload
+    )
+
+    $inCloudShell = Test-CloudShell
+    $htmlName = Split-Path $HtmlPath -Leaf
+    $dir      = Split-Path $HtmlPath -Parent
+
+    # Option 1: live, clickable, rendered page via Web preview.
+    if ($Serve) {
+        $py = Get-Command python3 -ErrorAction SilentlyContinue
+        if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
+        if (-not $py) {
+            Write-Host "Cannot serve: python is not available here. Use the download options below instead." -ForegroundColor Yellow
+        }
+        else {
+            Write-Host ""
+            Write-Host "Serving your report for in-browser viewing..." -ForegroundColor Cyan
+            Write-Host ("  1. In the Cloud Shell toolbar, click 'Web preview' and choose port {0}." -f $Port) -ForegroundColor Cyan
+            Write-Host ("  2. On the page that opens, click '{0}' to view the report." -f $htmlName) -ForegroundColor Cyan
+            Write-Host "  3. Press Ctrl+C here when you are done to stop the server." -ForegroundColor DarkGray
+            Write-Host ""
+            Push-Location $dir
+            try { & $py.Source '-m' 'http.server' "$Port" }
+            finally { Pop-Location }
+            return
+        }
+    }
+
+    # Option 2: auto-download the HTML straight to the browser (Cloud Shell only).
+    if ($inCloudShell -and -not $NoDownload) {
+        try {
+            Write-Host ""
+            Write-Host "Sending the HTML report to your browser downloads..." -ForegroundColor Cyan
+            download $HtmlPath
+            Write-Host "Done. Open the downloaded file to view the report in your browser." -ForegroundColor Green
+        }
+        catch {
+            Write-Host "Auto-download did not trigger. Use the manual command below." -ForegroundColor Yellow
+        }
+    }
+
+    # Always: copy-paste fallbacks so every customer has a way out.
+    Write-Host ""
+    Write-Host "Get your report (pick whichever is easiest):" -ForegroundColor Cyan
+    if ($inCloudShell) {
+        Write-Host "  Download to your computer:" -ForegroundColor DarkGray
+        Write-Host ("    download {0}" -f $HtmlPath)
+        Write-Host ("    download {0}" -f $CsvPath)
+        Write-Host "  View it rendered in the browser (clickable page):" -ForegroundColor DarkGray
+        Write-Host "    add -Serve when you run the assessment, then click 'Web preview'"
+        Write-Host "  Or use the toolbar: Manage files > Download > paste a path above." -ForegroundColor DarkGray
+    }
+    else {
+        Write-Host ("  Open this file in your browser: {0}" -f $HtmlPath) -ForegroundColor DarkGray
+    }
+}

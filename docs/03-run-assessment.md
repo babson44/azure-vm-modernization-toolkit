@@ -17,6 +17,43 @@ Or, if you cloned the repo:
 You'll see a live summary in the console and two files in `./reports`:
 an **HTML** report (open in a browser) and a **CSV** (open in Excel).
 
+## Getting the report onto your screen
+
+The report lives inside Cloud Shell, so you just need a way to view it. The toolkit makes
+this automatic, and you do **not** need a storage account for any of it.
+
+**Option 1: it downloads itself (default).**
+When the scan finishes in Cloud Shell, the HTML report is **automatically pushed to your
+browser's downloads**. Just open the downloaded file, it renders in your browser. Done.
+
+**Option 2: view it live in the browser (clickable, nothing to download).**
+Run the assessment with `-Serve`:
+
+```powershell
+./scripts/assess.ps1 -Serve
+```
+
+Then, in the Cloud Shell toolbar, click **Web preview** and choose port **8080**. A page
+opens, click the `assessment-<timestamp>.html` file to view the report rendered. Press
+**Ctrl+C** in the shell when you're done to stop the preview server.
+
+**Option 3: download it by hand.**
+The scan prints ready-to-paste commands. You can also run them yourself any time:
+
+```powershell
+download ./reports/assessment-<timestamp>.html
+download ./reports/assessment-<timestamp>.csv
+```
+
+**Option 4: the graphical way.**
+In the Cloud Shell toolbar, click **Manage files > Download**, and paste the file path
+(for example `reports/assessment-<timestamp>.html`).
+
+> **Ephemeral session?** If you reset Cloud Shell into the "no storage" mode, your files
+> disappear when the session closes, so download the report (Option 1, 3, or 4) before you
+> leave. To keep reports between sessions, reopen Cloud Shell and let it **mount storage**;
+> your reports then live under `~/clouddrive`.
+
 ## Reading the report: every column
 
 The HTML report has summary cards at the top, then one row per VM. Here is what **each

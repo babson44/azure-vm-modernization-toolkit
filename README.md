@@ -66,11 +66,22 @@ No installation. Works in any browser. You're already signed in.
    iwr https://raw.githubusercontent.com/babson44/azure-vm-modernization-toolkit/main/bootstrap.ps1 | iex
    ```
 
-3. When it finishes, open the generated report:
+3. **Your report opens itself.** When the scan finishes in Cloud Shell, the HTML report
+   is **automatically sent to your browser's downloads**, just open the downloaded file.
+
+   Want to see it rendered *without* downloading? Run it with `-Serve` and click the
+   **Web preview** button in the Cloud Shell toolbar:
 
    ```powershell
-   Get-ChildItem ./reports
+   iwr https://raw.githubusercontent.com/babson44/azure-vm-modernization-toolkit/main/bootstrap.ps1 -OutFile bootstrap.ps1
+   ./bootstrap.ps1        # auto-downloads the report
+   # or, to view it live in the browser instead:
+   ./azure-vm-modernization-toolkit/scripts/assess.ps1 -Serve
    ```
+
+   The scan also always prints copy-paste `download ...` commands and a **Manage files >
+   Download** tip, so you are never stuck. Full walkthrough with pictures-in-words:
+   **[docs/03-run-assessment.md](docs/03-run-assessment.md)**.
 
 That's it. New to Cloud Shell? Follow the zero-assumptions guide:
 **[docs/01-open-cloud-shell.md](docs/01-open-cloud-shell.md)**.

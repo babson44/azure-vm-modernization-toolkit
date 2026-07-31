@@ -13,10 +13,24 @@
 
 .EXAMPLE
     ./scripts/assess.ps1 -OutputDir ./reports
+
+.EXAMPLE
+    ./scripts/assess.ps1 -Serve
+    Runs the assessment, then serves the report so you can open it, fully rendered,
+    from the Cloud Shell "Web preview" button.
 #>
 [CmdletBinding()]
 param(
-    [string] $OutputDir = (Join-Path (Split-Path $PSScriptRoot -Parent) 'reports')
+    [string] $OutputDir = (Join-Path (Split-Path $PSScriptRoot -Parent) 'reports'),
+
+    # Serve the finished report over a local web server for in-browser (Web preview) viewing.
+    [switch] $Serve,
+
+    # Port to serve on when -Serve is used.
+    [int]    $Port = 8080,
+
+    # Skip the automatic browser download of the HTML report in Cloud Shell.
+    [switch] $NoDownload
 )
 
 Set-StrictMode -Version Latest
@@ -72,4 +86,8 @@ Write-Host ("  CSV:  {0}" -f $csvPath)
 Write-Host ""
 Write-Host "Next: review the report, then build a wave plan:" -ForegroundColor Cyan
 Write-Host ("  ./scripts/plan.ps1 -AssessmentCsv `"{0}`"" -f $csvPath)
+
+# Make the report effortless to open (auto-download in Cloud Shell, or -Serve to view rendered).
+# Kept last because -Serve blocks while the preview server runs.
+Show-ReportAccess -HtmlPath $htmlPath -CsvPath $csvPath -Serve:$Serve -Port $Port -NoDownload:$NoDownload
 Write-Host ""
