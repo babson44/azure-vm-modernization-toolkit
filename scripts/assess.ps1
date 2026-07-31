@@ -54,8 +54,14 @@ New-HtmlReport -Rows $rows -Path $htmlPath -Account $acct
 # Console summary
 $total      = $rows.Count
 $candidates = @($rows | Where-Object { $_.Track -notin @('NONE') }).Count
+$subCount   = @($rows | Select-Object -ExpandProperty Subscription -Unique).Count
+$savRows    = @($rows | Where-Object { $_.Track -notin @('NONE') -and $_.EstSavingsPct })
+$avgSav     = if ($savRows.Count) { [math]::Round(($savRows | Measure-Object EstSavingsPct -Average).Average, 0) } else { 0 }
 Write-Host ""
-Write-Host ("Scanned {0} VMs. Modernization candidates: {1}." -f $total, $candidates) -ForegroundColor Green
+Write-Host ("Scanned {0} VMs across {1} subscription(s). Modernization candidates: {2}." -f $total, $subCount, $candidates) -ForegroundColor Green
+if ($avgSav -gt 0) {
+    Write-Host ("Estimated average list-price saving on candidates: ~{0}% (guidance only)." -f $avgSav) -ForegroundColor Green
+}
 $rows | Group-Object Track | Sort-Object Name | ForEach-Object {
     Write-Host ("  Track {0,-6} {1}" -f $_.Name, $_.Count)
 }

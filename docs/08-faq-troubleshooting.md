@@ -15,6 +15,29 @@ locally. Nothing is sent anywhere.
 No. Copilot is an optional accelerator. The toolkit runs entirely with Cloud Shell (or local
 PowerShell) + Azure CLI.
 
+## Large / many‑subscription environments
+
+**How does it handle hundreds of subscriptions?**
+Azure Resource Graph queries **every subscription you can read in the tenant in one call** —
+there's no per‑subscription loop. Assign **Reader at the management‑group root** and one run
+covers the whole estate. See **[02 – Sign in & scope](02-sign-in-and-scope.md)**.
+
+**Will a huge fleet get throttled?**
+Possibly — Resource Graph enforces per‑tenant rate limits. The toolkit fetches results in
+pages of 1,000 and **retries each page with exponential backoff** on HTTP 429. If a page
+still fails after retries, the scan **aborts with a clear message** so you never mistake a
+partial result for the full picture. Just re‑run; transient throttling clears quickly.
+
+**The HTML report is slow / huge with tens of thousands of VMs.**
+Expected — a browser table of 30k rows is heavy. For large fleets, use the **CSV** as the
+source of truth (Excel / Power BI: filter, pivot, group by subscription or track). The HTML
+still gives you a **per‑subscription rollup** and totals at the top for a fast read.
+
+**Can I scope a run to just part of the estate?**
+Yes — sign in and set the subscriptions/tenant you want (`az login --tenant`, or Reader only
+where you need it), and the scan naturally covers just that. Management‑group‑scoped Reader
+is the cleanest way to target a division.
+
 ## Running it
 
 **`az: command not found`**

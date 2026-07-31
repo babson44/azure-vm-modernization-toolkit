@@ -8,18 +8,31 @@ human‑readable version.
 
 ```mermaid
 flowchart TD
-    A[VM found] --> B{Series v5, v6 or v7?}
-    B -- Yes --> Z[Track NONE - already modern]
+    A([VM found]) --> B{Series<br/>v5, v6 or v7?}
+    B -- Yes --> Z[Track NONE<br/>already modern]
     B -- No  --> C{Azure Virtual Desktop<br/>session host?}
-    C -- Yes --> TC[Track C - AVD image-replace<br/>build new modern hosts, drain old]
-    C -- No  --> D{Mapped to a modern target?}
-    D -- No  --> RV[REVIEW - manual mapping]
-    D -- Yes --> E{Azure VM generation?}
-    E -- Gen2 --> TA[Track A - in-place resize<br/>check region + quota + NVMe]
+    C -- Yes --> TC[Track C<br/>AVD image-replace<br/><small>build new modern hosts, drain old</small>]
+    C -- No  --> D{Mapped to a<br/>modern target?}
+    D -- No  --> RV[REVIEW<br/>manual mapping]
+    D -- Yes --> E{Azure VM<br/>generation?}
+    E -- Gen2 --> TA[Track A<br/>in-place resize<br/><small>check region + quota + NVMe</small>]
     E -- Gen1 --> F{Guest OS supports<br/>Gen2 + NVMe?}
-    F -- Yes --> TB[Track B - convert to Gen2<br/>Trusted Launch, then resize]
-    F -- No  --> TD[Track D - rebuild from<br/>modern Gen2 image]
+    F -- Yes --> TB[Track B<br/>convert to Gen2 + Trusted Launch,<br/>then resize]
+    F -- No  --> TD[Track D<br/>rebuild from modern Gen2 image]
+
+    classDef none fill:#e6f4ea,stroke:#107c10,color:#0b3d16;
+    classDef ta   fill:#e5f1fb,stroke:#0078d4,color:#04263f;
+    classDef tb   fill:#fff4e5,stroke:#d67c00,color:#5a3300;
+    classDef tc   fill:#f6e9ff,stroke:#8661c5,color:#3a2258;
+    classDef td   fill:#fde7e7,stroke:#d13438,color:#5a1416;
+    classDef rv   fill:#fff9e0,stroke:#c9a400,color:#5a4b00;
+    classDef q    fill:#f3f2f1,stroke:#8a8886,color:#1b1b1b;
+    class Z none; class TA ta; class TB tb; class TC tc; class TD td; class RV rv;
+    class B,C,D,E,F q;
 ```
+
+**Legend** &nbsp;
+🟢 NONE (modern) &nbsp; 🔵 A resize &nbsp; 🟠 B Gen1→Gen2 &nbsp; 🟣 C AVD &nbsp; 🔴 D rebuild &nbsp; 🟡 REVIEW
 
 > The "Guest OS supports Gen2 + NVMe?" decision can't be read reliably from the API, so the
 > assessment routes Gen1 VMs to **Track B by default** and marks it clearly: *if the OS

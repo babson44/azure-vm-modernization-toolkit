@@ -47,23 +47,54 @@ function Invoke-InventoryQuery {
         read, following the pagination skip-token. Returns an array of PSCustomObjects.
     #>
     param(
-        [string] $KqlPath = (Join-Path $PSScriptRoot 'inventory.kql')
+        [string] $KqlPath = (Join-Path $PSScriptRoot 'inventory.kql'),
+        [int]    $PageSize = 1000
     )
     if (-not (Test-Path $KqlPath)) { throw "Query file not found: $KqlPath" }
 
     # Strip // comment lines so the query is compact for the CLI.
     $kql = (Get-Content $KqlPath | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
 
-    $all = New-Object System.Collections.Generic.List[object]
+    # Resource Graph queries EVERY subscription the signed-in identity can read, in one
+    # call (no per-subscription loop). Large tenants come back in pages; we follow the
+    # skip-token until it is empty. Throttling (429) is expected at fleet scale, so each
+    # page is retried with exponential backoff. We NEVER silently return partial data:
+    # if a page ultimately fails, we throw so the customer knows the scan is incomplete.
+    $all  = New-Object System.Collections.Generic.List[object]
     $skip = $null
+    $page = 0
     do {
-        $args = @('graph','query','-q', $kql, '--first','1000','-o','json')
-        if ($skip) { $args += @('--skip-token', $skip) }
-        $raw = az @args 2>$null
-        if (-not $raw) { break }
-        $page = $raw | ConvertFrom-Json
-        foreach ($row in $page.data) { $all.Add($row) }
-        $skip = $page.skip_token
+        $page++
+        $qargs = @('graph','query','-q', $kql, '--first', "$PageSize", '-o','json')
+        if ($skip) { $qargs += @('--skip-token', $skip) }
+
+        $attempt = 0; $maxAttempts = 5; $result = $null
+        while ($true) {
+            $attempt++
+            $raw  = az @qargs 2>&1
+            $exit = $LASTEXITCODE
+            $err  = $null
+            if ($exit -eq 0 -and $raw) {
+                try { $result = ($raw | Out-String | ConvertFrom-Json) }
+                catch { $err = "Response was not valid JSON." }
+            } else {
+                $err = ($raw | Out-String).Trim()
+            }
+            if ($result) { break }
+
+            if ($attempt -ge $maxAttempts) {
+                throw "Resource Graph query failed on page $page after $maxAttempts attempts; the scan is INCOMPLETE. Last error: $err"
+            }
+            $throttled = $err -match '(?i)throttl|429|TooManyRequests|rate.?limit|Quota'
+            $wait = [math]::Min(60, [int][math]::Pow(2, $attempt))
+            $why  = if ($throttled) { 'throttled by Resource Graph' } else { 'transient query error' }
+            Write-Host ("  {0} - retry {1}/{2} in {3}s..." -f $why, $attempt, $maxAttempts, $wait) -ForegroundColor DarkYellow
+            Start-Sleep -Seconds $wait
+        }
+
+        foreach ($row in $result.data) { $all.Add($row) }
+        $skip = $result.skip_token
+        if ($skip) { Write-Host ("  ...retrieved {0} VMs, fetching more" -f $all.Count) -ForegroundColor DarkGray }
     } while ($skip)
 
     return $all.ToArray()
@@ -223,6 +254,23 @@ function New-HtmlReport {
     $byTrack    = $Rows | Group-Object Track | Sort-Object Name
     $gen        = (Get-Date).ToString('u')
 
+    # Weighted-average list-price saving across candidate VMs (guidance only).
+    $savRows = @($Rows | Where-Object { $_.Track -notin @('NONE') -and $_.EstSavingsPct })
+    $avgSav  = if ($savRows.Count) { [math]::Round(($savRows | Measure-Object EstSavingsPct -Average).Average, 0) } else { 0 }
+
+    # Per-subscription rollup - the key view for large, many-subscription tenants.
+    $subGroups = $Rows | Group-Object Subscription | Sort-Object { -(@($_.Group | Where-Object { $_.Track -notin @('NONE') }).Count) }
+    $subRows = ($subGroups | ForEach-Object {
+        $g = $_.Group
+        $c = @($g | Where-Object { $_.Track -notin @('NONE') }).Count
+        $a = @($g | Where-Object { $_.Track -eq 'A' }).Count
+        $b = @($g | Where-Object { $_.Track -eq 'B' }).Count
+        $tc= @($g | Where-Object { $_.Track -eq 'C' }).Count
+        $d = @($g | Where-Object { $_.Track -eq 'D' }).Count
+        $r = @($g | Where-Object { $_.Track -eq 'REVIEW' }).Count
+        "<tr><td class='mono'>$($_.Name)</td><td>$($g.Count)</td><td><b>$c</b></td><td>$a</td><td>$b</td><td>$tc</td><td>$d</td><td>$r</td></tr>"
+    }) -join "`n"
+
     $trackCards = ($byTrack | ForEach-Object {
         "<div class='card'><div class='big'>$($_.Count)</div><div class='lbl'>Track $($_.Name)</div></div>"
     }) -join "`n"
@@ -237,12 +285,13 @@ function New-HtmlReport {
             default  { 'rv' }
         }
         $flags = if ($_.ReviewFlags) { "<span class='flag'>$($_.ReviewFlags)</span>" } else { '' }
+        $sav   = if ($_.Track -notin @('NONE') -and $_.EstSavingsPct) { "~$($_.EstSavingsPct)%" } else { '&mdash;' }
         @"
 <tr class='$cls'>
   <td>$($_.Name)</td><td>$($_.OsType)</td><td>$($_.CurrentSize)</td>
   <td>$($_.Series)</td><td>$($_.Generation)</td>
   <td><b>$($_.Track)</b> $($_.TrackName)</td>
-  <td>$($_.Target)</td><td>$($_.Prerequisites) $flags</td>
+  <td>$($_.Target)</td><td class='sav'>$sav</td><td>$($_.Prerequisites) $flags</td>
   <td>$($_.Location)</td>
 </tr>
 "@
@@ -265,6 +314,9 @@ function New-HtmlReport {
  tr.ok{background:#f3faf3} tr.ta{background:#f3f8ff} tr.tb{background:#fff8f0}
  tr.tc{background:#fbf3ff} tr.td{background:#fff3f3} tr.rv{background:#fffbe6}
  .flag{display:inline-block;background:#fde7e9;color:#a4262c;border-radius:4px;padding:1px 6px;margin-left:4px;font-size:11px}
+ .mono{font-family:Consolas,monospace;font-size:12px} .sav{text-align:right;color:#107c10;font-weight:600}
+ h2{font-size:15px;margin:22px 0 8px} .sub-table{max-width:760px}
+ .note{font-size:12px;color:#605e5c;background:#f3f2f1;border-left:3px solid #0078d4;padding:8px 12px;margin:12px 0}
  .legend{font-size:12px;color:#605e5c;margin:14px 0}
  code{background:#f3f2f1;padding:1px 5px;border-radius:3px}
 </style></head><body>
@@ -277,6 +329,7 @@ function New-HtmlReport {
    <div class='card'><div class='big'>$total</div><div class='lbl'>VMs scanned</div></div>
    <div class='card'><div class='big'>$candidates</div><div class='lbl'>Candidates</div></div>
    <div class='card'><div class='big'>$modern</div><div class='lbl'>Already modern</div></div>
+   <div class='card'><div class='big'>~$avgSav%</div><div class='lbl'>Avg. list-price saving</div></div>
    $trackCards
  </div>
  <div class='legend'>
@@ -288,10 +341,19 @@ function New-HtmlReport {
    <code>REVIEW</code> manual. Red chips = review flags (encryption, zone/av-set pinning, specialized SKU).
    See <code>docs/04-decision-tree.md</code>.
  </div>
+ <h2>By subscription</h2>
+ <table class='sub-table'>
+  <thead><tr><th>Subscription ID</th><th>VMs</th><th>Candidates</th><th>A</th><th>B</th><th>C</th><th>D</th><th>Review</th></tr></thead>
+  <tbody>
+  $subRows
+  </tbody>
+ </table>
+ <h2>All VMs</h2>
+ <div class='note'>Est. saving is indicative list-price guidance (source series &rarr; target series), not a quote &mdash; validate against your actual pricing/reservations. For very large fleets the companion <b>CSV</b> is the authoritative, filterable artifact.</div>
  <table>
   <thead><tr>
    <th>VM</th><th>OS</th><th>Current size</th><th>Series</th><th>Gen</th>
-   <th>Track</th><th>Recommended target</th><th>Prerequisites / flags</th><th>Region</th>
+   <th>Track</th><th>Recommended target</th><th>Est. save</th><th>Prerequisites / flags</th><th>Region</th>
   </tr></thead>
   <tbody>
   $bodyRows

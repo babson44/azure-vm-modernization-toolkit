@@ -19,6 +19,21 @@ pass, using **Azure Resource Graph**. You don't have to loop through subscriptio
 - Reader lets the script **see** VMs and disks. It **cannot** change anything.
 - If you only have Reader on *some* subscriptions, the report simply covers those.
 
+### Large tenants: scope once at the management group
+
+If you have **many subscriptions**, don't assign Reader subscription‑by‑subscription.
+Assign **Reader once at the management‑group root** (or the top MG you care about) and it
+**inherits down to every subscription beneath it** — the scan then covers the whole estate
+in a single pass. Check your management‑group tree with:
+
+```powershell
+az account management-group list --query "[].{Name:name, DisplayName:displayName}" -o table
+```
+
+> Resource Graph automatically fans out across all subscriptions you can read — even
+> thousands — and the toolkit pages through the results and backs off if it gets throttled.
+> You don't need to shard or loop anything yourself.
+
 ## Check what you can see
 
 List the subscriptions your account can access:
