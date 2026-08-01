@@ -1,11 +1,11 @@
-# 08 - FAQ & troubleshooting
+# FAQ & troubleshooting
 
 ## General
 
 **Is this safe to run? Will it change anything?**
-No. `bootstrap.ps1`, `assess.ps1` and `plan.ps1` are **read-only**: Resource Graph queries
-and `az` read calls only. The minimum role is **Reader**. Making changes is done by *you*,
-following the track runbooks.
+No. `bootstrap.ps1`, `assess.ps1`, `plan.ps1` and `run.ps1` are **read-only**: Resource
+Graph queries and `az` read calls only. The minimum role is **Reader**. Making changes is
+done by *you*, following the [track runbooks](../4-execute/README.md).
 
 **Does my data leave my environment?**
 No. Everything runs in your Cloud Shell / machine, using your credentials, and writes files
@@ -20,7 +20,7 @@ PowerShell) + Azure CLI.
 **How does it handle hundreds of subscriptions?**
 Azure Resource Graph queries **every subscription you can read in the tenant in one call**,
 there's no per-subscription loop. Assign **Reader at the management-group root** and one run
-covers the whole estate. See **[02 - Sign in & scope](02-sign-in-and-scope.md)**.
+covers the whole estate. See [Stage 2, Step 3](../2-assess/README.md#step-3---understand-scope-multi-subscription).
 
 **Will a huge fleet get throttled?**
 Possibly, Resource Graph enforces per-tenant rate limits. The toolkit fetches results in
@@ -69,12 +69,13 @@ first**. If the OS can't support it, switch that VM to **Track D (rebuild)**.
 
 **Why is my whole AVD pool one track (C) and not resized in place?**
 AVD host pools are modernized by **image replacement** (new hosts, drain old) for near-zero
-user impact and clean rollback. See **[04 - Decision tree](04-decision-tree.md)**.
+user impact and clean rollback. See
+[how-vms-are-routed.md](../1-understand/how-vms-are-routed.md).
 
 **A VM has a red flag chip. What now?**
 It has a **review flag** (encrypted disk, zone/availability-set pinning, or a specialized
 SKU). Handle it individually, don't sweep it into a wave. Details in
-**[04 - Decision tree](04-decision-tree.md)**.
+[how-vms-are-routed.md](../1-understand/how-vms-are-routed.md).
 
 **The recommended target isn't available in my region.**
 Use the **fallback** in `config/sku-map.json` (usually the v5 equivalent), or pick another

@@ -14,7 +14,7 @@ place to the modern equivalent (e.g. `Standard_D8s_v4` → `Standard_D8s_v6`).
 - **Contributor** on the VM (or a custom role with `Microsoft.Compute/virtualMachines/write`).
 - The VM's **region and quota** support the target size.
 - If the target is **v6/v7**: the **guest OS supports NVMe** (see
-  [05 - Concepts](../05-concepts.md)).
+  [key concepts](../1-understand/key-concepts.md)).
 - A booked **change window** and the workload owner informed.
 
 Set variables (fill these in):

@@ -1,4 +1,4 @@
-# 06 - Approvals
+# Approvals: the two human sign-off gates
 
 Modernization has **two human sign-off gates**. They exist so that no one, and no automation
 or Copilot flow, moves from *analysis* to *change* without a person deciding it's ready.
@@ -12,15 +12,13 @@ assess  ─▶  ✅ GATE 1: Approve the assessment  ─▶  plan  ─▶  ✅ GA
 **Before** you build a wave plan, review the assessment report with the right people and
 confirm the picture is correct.
 
-Checklist:
-
 - [ ] The **candidate list** looks right (no surprise VMs, nothing critical missed).
 - [ ] **Owners** are identified for each workload / resource group.
 - [ ] **Review-flagged VMs** (encryption, zone/av-set pinning, specialized SKUs) have an owner
       and a decision.
 - [ ] **AVD host pools** (Track C) are confirmed and their owners looped in.
 - [ ] For anything targeting **v6/v7**, a plan exists to **verify NVMe OS support**.
-- [ ] Target **regions/quota** will be checked before execution (Track runbooks cover this).
+- [ ] Target **regions/quota** will be checked before execution (the track runbooks cover this).
 
 **Record the approval** (email, ticket, or change record). Keep the approved CSV.
 
@@ -29,8 +27,6 @@ Checklist:
 After running `plan.ps1`, review the **wave plan** and confirm the rollout order and change
 windows.
 
-Checklist:
-
 - [ ] **Wave 0 (Pilot)** VMs are genuinely low-risk / non-prod.
 - [ ] **Change windows** are booked for each wave; stakeholders notified.
 - [ ] **Snapshots** are part of every runbook step (they are).
@@ -38,7 +34,8 @@ Checklist:
 - [ ] **Manual-review** VMs are handled separately, not swept into a wave.
 - [ ] Success criteria are defined: *VM boots + application validated* before the next VM.
 
-**Record the approval.** Then execute wave by wave using the track runbooks.
+**Record the approval.** Then execute wave by wave using the
+[track runbooks](../4-execute/README.md).
 
 ## Optional: enforce the gates as files
 

@@ -93,7 +93,7 @@ Write-Host "Wave plan written:" -ForegroundColor Green
 Write-Host ("  HTML (Assessment + Plan tabs): {0}" -f $planHtml)
 Write-Host ("  CSV:                           {0}" -f $planPath)
 Write-Host ""
-Write-Host "Next: open the matching track runbook for each wave in docs/tracks/ and" -ForegroundColor Cyan
+Write-Host "Next: open the matching track runbook for each wave in 4-execute/ and" -ForegroundColor Cyan
 Write-Host "execute during an approved change window, snapshotting each VM first." -ForegroundColor Cyan
 
 # Make the report effortless to open (auto-download in Cloud Shell, or -Serve to view rendered).

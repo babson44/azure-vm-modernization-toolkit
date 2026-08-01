@@ -8,6 +8,25 @@ from older series (v1-v4) and **Gen1** to modern **Gen2** series (**v5 / v6 / v7
 
 ---
 
+## The journey (you are here)
+
+Modernizing VMs is four questions, in order. This repo is organized the same way, so a
+folder listing reads top-to-bottom like the path you actually take:
+
+| Stage | The question it answers | Changes anything? |
+|---|---|---|
+| **[1 - Understand](1-understand/)** | *Why modernize, and what do these terms mean?* | No, reading |
+| **[2 - Assess](2-assess/)** | *What do I have, and where should each VM go?* | No, read-only scan |
+| **[3 - Plan](3-plan/)** | *In what order do I roll this out safely?* | No, planning |
+| **[4 - Execute](4-execute/)** | *How do I make the change, per VM, safely?* | **Yes**, you, deliberately |
+
+Stuck? **[help/](help/)** has the FAQ and troubleshooting.
+
+**In a hurry?** Jump to [the fastest path](#fastest-path-azure-cloud-shell-recommended). New
+to any of this? Start with [1 - Understand](1-understand/why-modernize.md).
+
+---
+
 ## What this toolkit does
 
 1. **Scans every subscription you can read** (in one pass, using Azure Resource Graph).
@@ -15,16 +34,17 @@ from older series (v1-v4) and **Gen1** to modern **Gen2** series (**v5 / v6 / v7
 3. **Produces a report** (HTML + CSV) with, for every VM: current size, generation,
    the recommended target size, what has to happen first, and an estimated monthly
    **cost saving**.
-4. **Builds a wave plan** so you can modernize in safe batches (pilot → non-prod → prod).
+4. **Builds a wave plan** so you can modernize in safe batches (pilot -> non-prod -> prod).
 
 It does **not** make changes. Execution runbooks are provided as **step-by-step guides**
-(`docs/tracks/`) that you follow deliberately, during a change window, with approvals.
+([4-execute/](4-execute/)) that you follow deliberately, during a change window, with approvals.
 
 ---
 
 ## How each VM is routed
 
-Every VM is sent down **one** track. Full detail: **[docs/04-decision-tree.md](docs/04-decision-tree.md)**.
+Every VM is sent down **one** track. Full detail:
+**[1-understand/how-vms-are-routed.md](1-understand/how-vms-are-routed.md)**.
 
 ```mermaid
 flowchart TD
@@ -51,7 +71,7 @@ flowchart TD
     class B,C,D,E,F q;
 ```
 
-🟢 **NONE** already modern &nbsp;·&nbsp; 🔵 **A** resize &nbsp;·&nbsp; 🟠 **B** Gen1→Gen2 &nbsp;·&nbsp; 🟣 **C** AVD image-replace &nbsp;·&nbsp; 🔴 **D** rebuild &nbsp;·&nbsp; 🟡 **REVIEW** manual
+🟢 **NONE** already modern &nbsp;·&nbsp; 🔵 **A** resize &nbsp;·&nbsp; 🟠 **B** Gen1->Gen2 &nbsp;·&nbsp; 🟣 **C** AVD image-replace &nbsp;·&nbsp; 🔴 **D** rebuild &nbsp;·&nbsp; 🟡 **REVIEW** manual
 
 ---
 
@@ -74,8 +94,8 @@ No installation. Works in any browser. You're already signed in.
    *without* downloading? Add `-Serve` (see below) and click the **Web preview** button
    in the Cloud Shell toolbar.
 
-That's it. New to Cloud Shell? Follow the zero-assumptions guide:
-**[docs/01-open-cloud-shell.md](docs/01-open-cloud-shell.md)**.
+That's it. New to Cloud Shell? The zero-assumptions walkthrough is in **Stage 2**:
+**[2-assess/README.md](2-assess/README.md)**.
 
 Everything here is **read-only**. It never changes, stops, or deletes anything.
 
@@ -105,7 +125,8 @@ produces an **assessment report** (HTML + CSV).
 ./scripts/assess.ps1
 ```
 
-The assessment answers **"what and where."** Review it, then move on.
+The assessment answers **"what and where."** Review it, then move on. Full detail:
+**[2-assess/README.md](2-assess/README.md)**.
 
 ### Step 2 - Plan (in what order do I roll this out safely?)
 
@@ -130,6 +151,7 @@ it adds on top of the assessment. Pass the assessment CSV that Step 1 wrote:
 > fill it in.
 
 The plan writes the same two-tab HTML (**Assessment** + **Wave plan**) plus a plan CSV.
+Full detail: **[3-plan/README.md](3-plan/README.md)**.
 
 ### Prefer one command?
 
@@ -148,37 +170,33 @@ open it, fully rendered, from the Cloud Shell **Web preview** button:
 ./scripts/run.ps1 -Serve          # or assess.ps1 -Serve / plan.ps1 ... -Serve
 ```
 
-Full walkthrough with pictures-in-words:
-**[docs/03-run-assessment.md](docs/03-run-assessment.md)**.
-
 ---
 
 ## Prefer your own machine?
 
 You can run exactly the same thing from local **PowerShell 7+** with the **Azure CLI**.
-See **[docs/02-sign-in-and-scope.md](docs/02-sign-in-and-scope.md)**.
+The sign-in and scope steps are in **[2-assess/README.md](2-assess/README.md)**.
 
 ---
 
-## Documentation
+## Where everything lives
 
-| Doc | What it covers |
+| Folder | What's in it |
 |---|---|
-| [00 - Overview](docs/00-overview.md) | The whole approach at a glance |
-| [01 - Open Cloud Shell](docs/01-open-cloud-shell.md) | Step-by-step, nothing assumed |
-| [02 - Sign in & scope](docs/02-sign-in-and-scope.md) | Tenants, multiple subscriptions, required access |
-| [03 - Run the assessment](docs/03-run-assessment.md) | Run it and read **every** column of the report |
-| [04 - Decision tree & tracks](docs/04-decision-tree.md) | How each VM is routed to Track A/B/C/D |
-| [05 - Concepts explained](docs/05-concepts.md) | Gen1 vs Gen2, BIOS/UEFI, Trusted Launch, NVMe, why upgrade |
-| [06 - Approvals](docs/06-approvals.md) | The two human sign-off gates |
-| [07 - Plan & waves](docs/07-plan-and-waves.md) | Batching the rollout safely |
-| [08 - FAQ & troubleshooting](docs/08-faq-troubleshooting.md) | Common questions and fixes |
+| **[1-understand/](1-understand/)** | Why modernize, Gen1 vs Gen2, key concepts (Trusted Launch, NVMe, UEFI), and how each VM is routed |
+| **[2-assess/](2-assess/)** | Open Cloud Shell, sign in, scope multiple subscriptions, run the scan, read every column of the report |
+| **[3-plan/](3-plan/)** | Turn the assessment into rollout waves, and the two human approval gates |
+| **[4-execute/](4-execute/)** | The track runbooks (A/B/C/D), the safe per-VM sequence, snapshots and rollback |
+| **[help/](help/)** | FAQ and troubleshooting |
+| `scripts/` | The PowerShell (`assess.ps1`, `plan.ps1`, `run.ps1`, shared lib) |
+| `config/` | `sku-map.json`, old family -> recommended target + prerequisites |
+| `samples/` | An example report so you can see the output before you run it |
 
 **Track runbooks** (the actual how-to for making changes):
-[Track A - Resize](docs/tracks/track-a-resize.md) ·
-[Track B - Gen1→Gen2](docs/tracks/track-b-gen1-to-gen2.md) ·
-[Track C - AVD image-replace](docs/tracks/track-c-avd-image-replace.md) ·
-[Track D - Rebuild](docs/tracks/track-d-rebuild.md)
+[Track A - Resize](4-execute/track-a-resize.md) ·
+[Track B - Gen1->Gen2](4-execute/track-b-gen1-to-gen2.md) ·
+[Track C - AVD image-replace](4-execute/track-c-avd-image-replace.md) ·
+[Track D - Rebuild](4-execute/track-d-rebuild.md)
 
 ---
 
@@ -200,7 +218,7 @@ Built for tenants with **hundreds of subscriptions and tens of thousands of VMs*
   digestible at a glance.
 - **Multiple tenants?** Resource Graph is scoped to the signed-in tenant. For each
   additional tenant, run `az login --tenant <id>` and re-run the assessment. See
-  **[docs/02-sign-in-and-scope.md](docs/02-sign-in-and-scope.md)**.
+  **[2-assess/README.md](2-assess/README.md)**.
 
 ---
 

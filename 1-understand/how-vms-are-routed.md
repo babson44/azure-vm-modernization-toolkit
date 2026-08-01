@@ -1,4 +1,4 @@
-# 04 - Decision tree & tracks
+# How each VM is routed (the decision tree)
 
 Every VM the assessment finds is routed through this tree to exactly one **track**. The
 script implements it in `scripts/lib/common.ps1` (`Get-Verdict`); this page is the
@@ -52,14 +52,14 @@ bucket:
 | `zone-pinned` | The target size must exist **in that specific zone**; availability differs per zone. |
 | `specialized-sku` | GPU (N-series), HPC (H-series), memory (M-series) or confidential (DC/EC) VMs have their own upgrade paths and constraints, not a generic resize. |
 
-## The four tracks (summary)
+## The four tracks
 
 | Track | Trigger | Downtime | Runbook |
 |---|---|---|---|
-| **A - Resize** | Gen2, older series | Minutes (reboot) | [track-a-resize.md](tracks/track-a-resize.md) |
-| **B - Gen1→Gen2** | Gen1, OS supports Gen2/NVMe | Short (convert + reboot) | [track-b-gen1-to-gen2.md](tracks/track-b-gen1-to-gen2.md) |
-| **C - AVD image-replace** | AVD host pool | Near-zero (drain) | [track-c-avd-image-replace.md](tracks/track-c-avd-image-replace.md) |
-| **D - Rebuild** | Gen1, OS too old | Planned (redeploy) | [track-d-rebuild.md](tracks/track-d-rebuild.md) |
+| **A - Resize** | Gen2, older series | Minutes (reboot) | [track-a-resize.md](../4-execute/track-a-resize.md) |
+| **B - Gen1→Gen2** | Gen1, OS supports Gen2/NVMe | Short (convert + reboot) | [track-b-gen1-to-gen2.md](../4-execute/track-b-gen1-to-gen2.md) |
+| **C - AVD image-replace** | AVD host pool | Near-zero (drain) | [track-c-avd-image-replace.md](../4-execute/track-c-avd-image-replace.md) |
+| **D - Rebuild** | Gen1, OS too old | Planned (redeploy) | [track-d-rebuild.md](../4-execute/track-d-rebuild.md) |
 
 ## Why AVD is its own track
 

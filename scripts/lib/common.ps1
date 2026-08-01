@@ -147,7 +147,7 @@ function Get-Verdict {
     <#
         The per-VM decision tree. Returns a verdict object: Track (A/B/C/D or NONE),
         Action summary, and ReviewFlags that pull a VM aside for a human regardless.
-        See docs/04-decision-tree.md.
+        See 1-understand/how-vms-are-routed.md.
     #>
     param(
         [object] $Vm,
@@ -344,7 +344,7 @@ function Get-AssessmentBodyHtml {
    <code>C</code> AVD image-replace &middot;
    <code>D</code> rebuild &middot;
    <code>REVIEW</code> manual. Red chips = review flags (encryption, zone/av-set pinning, specialized SKU).
-   See <code>docs/04-decision-tree.md</code>.
+   See <code>1-understand/how-vms-are-routed.md</code>.
  </div>
  <h2>By subscription</h2>
  <table class='sub-table'>
@@ -494,7 +494,7 @@ function Get-PlanBodyHtml {
  $s1
  $s2
  $sr
- <div class='legend'>Next: open the matching runbook in <code>docs/tracks/</code> for each VM's track and execute it wave by wave. Track <code>A</code> = in-place resize, <code>B</code> = Gen1&rarr;Gen2 then resize, <code>C</code> = AVD image-replace, <code>D</code> = rebuild.</div>
+ <div class='legend'>Next: open the matching runbook in <code>4-execute/</code> for each VM's track and execute it wave by wave. Track <code>A</code> = in-place resize, <code>B</code> = Gen1&rarr;Gen2 then resize, <code>C</code> = AVD image-replace, <code>D</code> = rebuild.</div>
 "@
 }
 
