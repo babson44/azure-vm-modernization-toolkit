@@ -3,6 +3,7 @@ reports/
 *.csv
 *.html
 !samples/*.html
+!metrics/*.csv
 
 # Azure / auth
 .azure/

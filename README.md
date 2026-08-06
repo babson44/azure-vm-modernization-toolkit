@@ -118,6 +118,24 @@ Everything here is **read-only**. It never changes, stops, or deletes anything.
 
 ---
 
+## Prefer to clone first? (enterprise / security-reviewed path)
+
+Some organizations block `iwr ... | iex` by policy, or you may simply want to **read the
+code before you run it**. That's fully supported. Clone the repo, review the scripts,
+then run the same one-shot assessment:
+
+```powershell
+git clone https://github.com/babson44/azure-vm-modernization-toolkit
+cd azure-vm-modernization-toolkit
+./scripts/run.ps1
+```
+
+This does exactly what the one-liner does (read-only **assess + wave plan** in one pass,
+across every subscription you can read), but nothing runs until **you** have inspected
+the code. Add `-Serve` to open the report from the Cloud Shell **Web preview** button.
+
+---
+
 ## The two steps, explained
 
 The one-liner above does both of these for you. If you'd rather run them yourself, or
