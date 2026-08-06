@@ -41,6 +41,23 @@ It does **not** make changes. Execution runbooks are provided as **step-by-step 
 
 ---
 
+## What the report looks like
+
+One run produces a single HTML page with two tabs, backed by CSVs. These are from a real
+scan of a 321-VM estate.
+
+**Assessment tab** — every VM with its current size, generation, assigned track, recommended
+target, estimated saving, prerequisites/flags, and a per-subscription rollup:
+
+![Assessment tab of the report](samples/images/report-assessment.png)
+
+**Wave plan tab** — the same candidates grouped into safe rollout waves (pilot, non-prod,
+production, manual review):
+
+![Wave plan tab of the report](samples/images/report-wave-plan.png)
+
+---
+
 ## How each VM is routed
 
 Every VM is sent down **one** track. Full detail:
