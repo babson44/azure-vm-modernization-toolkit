@@ -63,6 +63,11 @@ production, manual review):
 Every VM is sent down **one** track. Full detail:
 **[1-understand/how-vms-are-routed.md](1-understand/how-vms-are-routed.md)**.
 
+<img src="samples/images/decision-tree.png" alt="VM modernization decision tree: routes each VM to Track NONE (already modern), Track A (in-place resize), Track B (Gen1 to Gen2 then resize), Track C (AVD image-replace), Track D (rebuild), or REVIEW (manual mapping)." width="640">
+
+<details>
+<summary>Diagram source (Mermaid)</summary>
+
 ```mermaid
 flowchart TD
     A([VM found]) --> B{Series<br/>v5, v6 or v7?}
@@ -87,6 +92,9 @@ flowchart TD
     class Z none; class TA ta; class TBR tb; class TC tc; class TDR td; class RV rv;
     class B,C,D,E,F q;
 ```
+
+> Regenerate the image after editing: re-render this block and overwrite `samples/images/decision-tree.png`.
+</details>
 
 🟢 **NONE** already modern &nbsp;·&nbsp; 🔵 **A** resize &nbsp;·&nbsp; 🟠 **B** Gen1->Gen2 &nbsp;·&nbsp; 🟣 **C** AVD image-replace &nbsp;·&nbsp; 🔴 **D** rebuild &nbsp;·&nbsp; 🟡 **REVIEW** manual
 
