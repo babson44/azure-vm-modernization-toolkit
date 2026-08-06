@@ -18,7 +18,7 @@ flowchart TD
     E -- Gen2 --> TA[Track A<br/>in-place resize<br/><small>check region + quota + NVMe</small>]
     E -- Gen1 --> F{Guest OS supports<br/>Gen2 + NVMe?}
     F -- Yes --> TB[Track B<br/>convert to Gen2 + Trusted Launch,<br/>then resize]
-    F -- No  --> TD[Track D<br/>rebuild from modern Gen2 image]
+    F -- No  --> TDR[Track D<br/>rebuild from modern Gen2 image]
 
     classDef none fill:#e6f4ea,stroke:#107c10,color:#0b3d16;
     classDef ta   fill:#e5f1fb,stroke:#0078d4,color:#04263f;
@@ -27,7 +27,7 @@ flowchart TD
     classDef td   fill:#fde7e7,stroke:#d13438,color:#5a1416;
     classDef rv   fill:#fff9e0,stroke:#c9a400,color:#5a4b00;
     classDef q    fill:#f3f2f1,stroke:#8a8886,color:#1b1b1b;
-    class Z none; class TA ta; class TB tb; class TC tc; class TD td; class RV rv;
+    class Z none; class TA ta; class TB tb; class TC tc; class TDR td; class RV rv;
     class B,C,D,E,F q;
 ```
 
