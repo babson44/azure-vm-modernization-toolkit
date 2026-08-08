@@ -24,14 +24,14 @@ function Invoke-AzJson {
         we never silently show partial capacity data.
     #>
     param(
-        [string[]] $Args,
+        [string[]] $AzArgs,
         [int]      $MaxAttempts = 4,
         [switch]   $AllowEmpty
     )
     $attempt = 0
     while ($true) {
         $attempt++
-        $raw  = az @Args 2>&1
+        $raw  = az @AzArgs 2>&1
         $exit = $LASTEXITCODE
         if ($exit -eq 0) {
             $text = ($raw | Out-String).Trim()
@@ -40,7 +40,7 @@ function Invoke-AzJson {
         }
         if ($attempt -ge $MaxAttempts) {
             $err = ($raw | Out-String).Trim()
-            throw "Azure read command failed after $MaxAttempts attempts (az $($Args -join ' ')). Last error: $err"
+            throw "Azure read command failed after $MaxAttempts attempts (az $($AzArgs -join ' ')). Last error: $err"
         }
         $wait = [math]::Min(30, [int][math]::Pow(2, $attempt))
         Write-Host ("  capacity read retry {0}/{1} in {2}s..." -f $attempt, $MaxAttempts, $wait) -ForegroundColor DarkYellow
@@ -81,7 +81,7 @@ function Get-RegionSkuMap {
     $map = @{}
     foreach ($region in $Regions) {
         Write-Host ("  reading SKU availability in {0}..." -f $region) -ForegroundColor DarkGray
-        $skus = Invoke-AzJson -Args @('vm','list-skus','--location',$region,'--resource-type','virtualMachines','-o','json') -AllowEmpty
+        $skus = Invoke-AzJson -AzArgs @('vm','list-skus','--location',$region,'--resource-type','virtualMachines','-o','json') -AllowEmpty
         $byName = @{}
         foreach ($s in @($skus)) {
             $vcpu = 0
@@ -129,7 +129,7 @@ function Get-RegionUsageMap {
     $map = @{}
     foreach ($region in $Regions) {
         Write-Host ("  reading quota / usage in {0}..." -f $region) -ForegroundColor DarkGray
-        $usage = Invoke-AzJson -Args @('vm','list-usage','--location',$region,'-o','json') -AllowEmpty
+        $usage = Invoke-AzJson -AzArgs @('vm','list-usage','--location',$region,'-o','json') -AllowEmpty
         $byFamily = @{}
         foreach ($u in @($usage)) {
             $key = if ($u.name -and $u.name.value) { $u.name.value } else { [string]$u.name }
