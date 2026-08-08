@@ -92,8 +92,8 @@ $usageMap = Get-RegionUsageMap -Regions $regions
 
 Write-Host ""
 Write-Host "Step 3 of 3 - Cross-referencing recommended targets against availability + quota..." -ForegroundColor Yellow
-$targetCap = Get-TargetCapacity   -Rows $rows -SkuMap $skuMap -UsageMap $usageMap
-$matrix    = Get-RegionQuotaMatrix -UsageMap $usageMap
+$targetCap = Get-TargetCapacity   -Rows $rows -SkuMap $skuMap -UsageMap $usageMap -OverrideRegions $Regions
+$matrix    = Get-RegionQuotaMatrix -UsageMap $usageMap -TargetCapacity $targetCap
 
 if (-not (Test-Path $OutputDir)) { New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null }
 $stamp    = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -104,13 +104,13 @@ $targetCap | Export-Csv -Path $csvPath -NoTypeInformation -Encoding utf8
 New-CapacityHtmlReport -TargetCapacity $targetCap -QuotaMatrix $matrix -Path $htmlPath -Account $acct -Regions $regions
 
 # Console summary
-$blocked = @($targetCap | Where-Object { $_.Availability -in @('Restricted','Not offered') -or $_.Quota -eq 'Shortfall' })
+$blocked = @($targetCap | Where-Object { $_.VerdictClass -eq 'bad' })
 Write-Host ""
 Write-Host ("Checked {0} target/region combination(s) across {1} region(s)." -f @($targetCap).Count, $regions.Count) -ForegroundColor Green
 if ($blocked.Count -gt 0) {
     Write-Host ("  {0} combination(s) have a capacity or quota blocker to resolve:" -f $blocked.Count) -ForegroundColor Yellow
     $blocked | ForEach-Object {
-        Write-Host ("    {0} in {1}: availability={2}, quota={3}" -f $_.Target, $_.Region, $_.Availability, $_.Quota) -ForegroundColor DarkYellow
+        Write-Host ("    {0} in {1}: {2}" -f $_.Target, $_.Region, $_.Verdict) -ForegroundColor DarkYellow
     }
 } else {
     Write-Host "  No availability or quota blockers found (still confirm live capacity with the capacity team)." -ForegroundColor Green

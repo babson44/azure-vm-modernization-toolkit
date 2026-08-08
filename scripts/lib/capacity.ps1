@@ -134,6 +134,10 @@ function Get-RegionUsageMap {
         foreach ($u in @($usage)) {
             $key = if ($u.name -and $u.name.value) { $u.name.value } else { [string]$u.name }
             if (-not $key) { continue }
+            # Keep only vCPU/core quotas: per-family core limits (e.g. "standardDSv5Family")
+            # and the regional total ("cores"). This drops storage/snapshot/disk-GB rows
+            # that share this endpoint and are noise for a compute modernization.
+            if (-not ($key -match 'Family$' -or $key -eq 'cores')) { continue }
             $byFamily[$key] = @{
                 Current   = [int]$u.currentValue
                 Limit     = [int]$u.limit
@@ -148,43 +152,62 @@ function Get-RegionUsageMap {
 function Get-TargetCapacity {
     <#
         Cross-references each recommended target (from the assessment) against the
-        region SKU map and usage map. One row per unique (Target, Region) pair among
-        the modernization candidates, with a plain-language verdict.
+        region SKU map and usage map, and produces a plain-language verdict per
+        (target, region). Two modes:
+
+          - Default (in-place resize): each target is checked in the region its VMs
+            already run in. Group by (Target, Location).
+          - Consolidation (-OverrideRegions): each distinct target is checked in every
+            region the operator named, because they intend to land the VMs there.
+
+        Quota need is aggregated across the whole wave (VMs x target vCPUs), and when it
+        exceeds free quota the exact "+N cores" to request is surfaced.
     #>
     param(
         [object[]]  $Rows,
         [hashtable] $SkuMap,
-        [hashtable] $UsageMap
+        [hashtable] $UsageMap,
+        [string[]]  $OverrideRegions
     )
 
-    $pairs = $Rows |
-        Where-Object { $_.Track -notin @('NONE') -and $_.Target -and $_.Location } |
-        Group-Object { "{0}|{1}" -f $_.Target, $_.Location.ToLower() }
+    $candidates = @($Rows | Where-Object { $_.Track -notin @('NONE') -and $_.Target -and $_.Location })
+    $override   = @($OverrideRegions | Where-Object { $_ } | ForEach-Object { $_.ToLower().Trim() } | Select-Object -Unique)
+
+    # Build (target, region, vmCount) tuples for the chosen mode.
+    $tuples = New-Object System.Collections.Generic.List[object]
+    if ($override.Count -gt 0) {
+        foreach ($g in ($candidates | Group-Object Target)) {
+            foreach ($region in $override) {
+                $tuples.Add([pscustomobject]@{ Target = $g.Name; Region = $region; VmCount = $g.Count })
+            }
+        }
+    }
+    else {
+        foreach ($g in ($candidates | Group-Object { "{0}|{1}" -f $_.Target, $_.Location.ToLower() })) {
+            $first = $g.Group[0]
+            $tuples.Add([pscustomobject]@{ Target = $first.Target; Region = $first.Location.ToLower(); VmCount = $g.Count })
+        }
+    }
 
     $out = New-Object System.Collections.Generic.List[object]
-    foreach ($p in $pairs) {
-        $first  = $p.Group[0]
-        $target = $first.Target
-        $region = $first.Location.ToLower()
-        $count  = $p.Group.Count
+    foreach ($t in $tuples) {
+        $target = $t.Target; $region = $t.Region; $count = [int]$t.VmCount
 
-        $availability = 'Unknown'
-        $availDetail  = ''
-        $quota        = 'Unknown'
-        $quotaDetail  = ''
-        $family       = ''
+        # Only emit rows for regions we actually scanned, so we never show "unknown" noise.
+        if (-not $SkuMap.ContainsKey($region)) { continue }
+
+        $availability = 'Unknown'; $availDetail = ''; $family = ''; $famLocal = ''; $vcpuPer = 0
+        $quota = 'Unknown'; $quotaDetail = ''; $used = 0; $limit = 0; $free = 0; $needed = 0; $deficit = 0
 
         $regionSkus = $SkuMap[$region]
-        if (-not $regionSkus) {
-            $availDetail = 'Region not scanned.'
-        }
-        elseif (-not $regionSkus.ContainsKey($target)) {
+        if (-not $regionSkus.ContainsKey($target)) {
             $availability = 'Not offered'
             $availDetail  = 'Target size is not offered in this region.'
         }
         else {
-            $info   = $regionSkus[$target]
-            $family = $info.Family
+            $info    = $regionSkus[$target]
+            $family  = $info.Family
+            $vcpuPer = [int]$info.VCpus
             if ($info.LocationRestricted) {
                 $availability = 'Restricted'
                 $availDetail  = "Not available to this subscription in $region ($($info.Reason))."
@@ -198,37 +221,56 @@ function Get-TargetCapacity {
                 $availDetail  = 'Offered to this subscription in this region.'
             }
 
-            # Quota only meaningful when the size is at least offered.
+            # Quota only meaningful when the size is at least offered. Test the WHOLE wave.
             if ($availability -ne 'Restricted' -and $availability -ne 'Not offered') {
+                $needed = $vcpuPer * $count
                 $regionUsage = $UsageMap[$region]
                 if ($regionUsage -and $family -and $regionUsage.ContainsKey($family)) {
                     $u = $regionUsage[$family]
-                    $free = $u.Limit - $u.Current
-                    $need = if ($info.VCpus -gt 0) { $info.VCpus } else { 0 }
-                    if ($need -gt 0 -and $free -lt $need) {
+                    $used = [int]$u.Current; $limit = [int]$u.Limit; $free = $limit - $used; $famLocal = $u.LocalName
+                    if ($needed -gt 0 -and $free -lt $needed) {
+                        $deficit     = $needed - $free
                         $quota       = 'Shortfall'
-                        $quotaDetail = "Need $need vCPU, only $free free of $($u.Limit) in family '$($u.LocalName)'."
+                        $quotaDetail = "Need $needed vCPU for $count VM(s), only $free free of $limit in '$famLocal'. Request +$deficit cores."
                     }
                     else {
                         $quota       = 'OK'
-                        $quotaDetail = "$free of $($u.Limit) vCPU free in family '$($u.LocalName)'."
+                        $quotaDetail = "$free of $limit vCPU free in '$famLocal' (this wave needs $needed for $count VM(s))."
                     }
                 }
                 else {
-                    $quotaDetail = 'No usage figure returned for this family.'
+                    $quotaDetail = 'No vCPU usage figure returned for this family.'
                 }
             }
         }
 
+        # Single combined verdict for the money table.
+        $verdict = 'Unknown'; $vclass = 'unk'
+        if ($availability -eq 'Not offered') { $verdict = 'Not offered here'; $vclass = 'bad' }
+        elseif ($availability -eq 'Restricted') { $verdict = 'Restricted (subscription)'; $vclass = 'bad' }
+        elseif ($quota -eq 'Shortfall') { $verdict = "Request quota (+$deficit cores)"; $vclass = 'bad' }
+        elseif ($availability -eq 'Available (zonal limits)') { $verdict = 'Ready (zonal limits)'; $vclass = 'warn' }
+        elseif ($quota -eq 'OK') { $verdict = 'Ready'; $vclass = 'ok' }
+        elseif ($quota -eq 'Unknown') { $verdict = 'Check quota'; $vclass = 'unk' }
+
         $out.Add([pscustomobject]@{
             Target        = $target
             Region        = $region
-            Family        = $family
+            Family        = $(if ($famLocal) { $famLocal } else { $family })
+            FamilyKey     = $family
             VmCount       = $count
+            VCpusPerVm    = $vcpuPer
+            VCpusNeeded   = $needed
+            Used          = $used
+            Limit         = $limit
+            Free          = $free
+            Deficit       = $deficit
             Availability  = $availability
             AvailDetail   = $availDetail
             Quota         = $quota
             QuotaDetail   = $quotaDetail
+            Verdict       = $verdict
+            VerdictClass  = $vclass
         })
     }
     return @($out | Sort-Object Region, Target)
@@ -238,9 +280,26 @@ function Get-RegionQuotaMatrix {
     <#
         The standalone "what can I deploy here" view: for each scanned region, the vCPU
         families with the most headroom. Useful even when nobody is modernizing - it is
-        the capacity question sellers and customers ask on its own.
+        the capacity question sellers and customers ask on its own. When target capacity
+        is supplied, a "Needed now" column shows how much of that headroom this migration
+        would consume, so the two views reconcile.
     #>
-    param([hashtable] $UsageMap)
+    param(
+        [hashtable] $UsageMap,
+        [object[]]  $TargetCapacity
+    )
+
+    # region|familyKey -> vCPUs this migration needs; plus a per-region grand total for "cores".
+    $needByFam   = @{}
+    $needByRegion = @{}
+    foreach ($r in @($TargetCapacity)) {
+        if (-not $r.FamilyKey) { continue }
+        $k = "{0}|{1}" -f $r.Region, $r.FamilyKey
+        if (-not $needByFam.ContainsKey($k)) { $needByFam[$k] = 0 }
+        $needByFam[$k] += [int]$r.VCpusNeeded
+        if (-not $needByRegion.ContainsKey($r.Region)) { $needByRegion[$r.Region] = 0 }
+        $needByRegion[$r.Region] += [int]$r.VCpusNeeded
+    }
 
     $rows = New-Object System.Collections.Generic.List[object]
     foreach ($region in ($UsageMap.Keys | Sort-Object)) {
@@ -248,77 +307,121 @@ function Get-RegionQuotaMatrix {
             $u = $UsageMap[$region][$fam]
             if ($u.Limit -le 0) { continue }
             $free = $u.Limit - $u.Current
+            $needed = if ($fam -eq 'cores') {
+                if ($needByRegion.ContainsKey($region)) { [int]$needByRegion[$region] } else { 0 }
+            }
+            else {
+                $k = "{0}|{1}" -f $region, $fam
+                if ($needByFam.ContainsKey($k)) { [int]$needByFam[$k] } else { 0 }
+            }
             $rows.Add([pscustomobject]@{
                 Region    = $region
                 Family    = $u.LocalName
                 Used      = $u.Current
                 Limit     = $u.Limit
                 Free      = $free
+                Needed    = $needed
                 UsedPct   = [math]::Round(($u.Current / $u.Limit) * 100, 0)
             })
         }
     }
-    return @($rows | Sort-Object Region, @{Expression='Free';Descending=$true})
+    # Families this migration touches first (needed desc), then the rest by free headroom.
+    return @($rows | Sort-Object Region, @{Expression='Needed';Descending=$true}, @{Expression='Free';Descending=$true})
 }
 
 function Get-CapacityBodyHtml {
     <#
-        Renders the capacity view: the standing caution note, a target-availability
-        table (tied to the modernization plan), and the region/family quota matrix.
-        Reuses the shared report CSS classes from common.ps1.
+        Renders the capacity view: a scorecard, the standing caution note, a region-first
+        "can I land my modernization" table (grouped by region, then target family), and
+        the region/family vCPU headroom matrix. Reuses the shared report CSS classes from
+        common.ps1 plus the capacity chips from Get-CapacityCss.
     #>
     param(
         [object[]] $TargetCapacity,
         [object[]] $QuotaMatrix
     )
 
-    $chip = {
-        param($state)
-        switch -Wildcard ($state) {
-            'Available'          { "<span class='cap ok'>Available</span>" }
-            'Available*'         { "<span class='cap warn'>$state</span>" }
-            'OK'                 { "<span class='cap ok'>OK</span>" }
-            'Restricted'         { "<span class='cap bad'>Restricted</span>" }
-            'Not offered'        { "<span class='cap bad'>Not offered</span>" }
-            'Shortfall'          { "<span class='cap bad'>Shortfall</span>" }
-            default              { "<span class='cap unk'>$state</span>" }
-        }
-    }
+    $tc = @($TargetCapacity)
 
-    $targetRows = (@($TargetCapacity) | ForEach-Object {
-        $a = & $chip $_.Availability
-        $q = & $chip $_.Quota
-        "<tr><td class='mono'>$($_.Target)</td><td class='mono'>$($_.Region)</td><td>$($_.VmCount)</td><td>$a<div class='cap-d'>$($_.AvailDetail)</div></td><td>$q<div class='cap-d'>$($_.QuotaDetail)</div></td></tr>"
-    }) -join "`n"
-    if (-not $targetRows) { $targetRows = "<tr><td colspan='5'>No modernization candidates to check.</td></tr>" }
+    # --- Scorecard -----------------------------------------------------------------
+    $sumVms   = ($tc | Measure-Object VmCount -Sum).Sum;      if (-not $sumVms)   { $sumVms = 0 }
+    $sumVcpu  = ($tc | Measure-Object VCpusNeeded -Sum).Sum;  if (-not $sumVcpu)  { $sumVcpu = 0 }
+    $nRegions = @($tc | Select-Object -ExpandProperty Region -Unique).Count
+    $nFam     = @($tc | Where-Object { $_.FamilyKey } | Select-Object -ExpandProperty FamilyKey -Unique).Count
+    $nBlock   = @($tc | Where-Object { $_.Quota -eq 'Shortfall' }).Count
+    $nRestr   = @($tc | Where-Object { $_.Availability -in @('Restricted','Not offered') }).Count
+    $blockCls = if ($nBlock -gt 0) { 'big cap-num-bad' } else { 'big' }
+    $restrCls = if ($nRestr -gt 0) { 'big cap-num-bad' } else { 'big' }
 
-    $matrixRows = (@($QuotaMatrix) | ForEach-Object {
-        $cls = if ($_.UsedPct -ge 90) { 'bad' } elseif ($_.UsedPct -ge 70) { 'warn' } else { 'ok' }
-        "<tr><td class='mono'>$($_.Region)</td><td>$($_.Family)</td><td class='num'>$($_.Used)</td><td class='num'>$($_.Limit)</td><td class='num'><b>$($_.Free)</b></td><td class='num'><span class='cap $cls'>$($_.UsedPct)%</span></td></tr>"
-    }) -join "`n"
-    if (-not $matrixRows) { $matrixRows = "<tr><td colspan='6'>No usage data returned.</td></tr>" }
+    $cards = @"
+ <div class='cards'>
+   <div class='card'><div class='big'>$sumVms</div><div class='lbl'>Legacy VMs in scope</div></div>
+   <div class='card'><div class='big'>$sumVcpu</div><div class='lbl'>vCPUs to place</div></div>
+   <div class='card'><div class='big'>$nRegions</div><div class='lbl'>Regions</div></div>
+   <div class='card'><div class='big'>$nFam</div><div class='lbl'>Target families</div></div>
+   <div class='card'><div class='$blockCls'>$nBlock</div><div class='lbl'>Quota blockers</div></div>
+   <div class='card'><div class='$restrCls'>$nRestr</div><div class='lbl'>Restricted / not offered</div></div>
+ </div>
+"@
 
-    @"
- <div class='note cap-warn'><b>Read this first.</b> "Available" and "quota OK" mean the SKU is
- offered to your subscription and you have vCPU headroom. They do <b>not</b> guarantee live
- datacenter capacity at deploy time. In capacity-constrained regions (for example Canada),
- confirm a migration wave with the Azure capacity team before committing. This view is read-only.</div>
+    # --- Section B: region-first "can I land it" table -----------------------------
+    $regionSections = ''
+    foreach ($region in (@($tc | Select-Object -ExpandProperty Region -Unique) | Sort-Object)) {
+        $rrows = @($tc | Where-Object { $_.Region -eq $region } | Sort-Object @{Expression='VerdictClass';Descending=$false}, Target)
+        $rBlockers = @($rrows | Where-Object { $_.VerdictClass -eq 'bad' }).Count
+        $badge = if ($rBlockers -gt 0) { "<span class='cap bad'>$rBlockers to resolve</span>" } else { "<span class='cap ok'>all clear</span>" }
 
- <h2>Recommended targets - availability &amp; quota</h2>
- <div class='legend'>One row per recommended target size in each region where you have candidates.
- A <span class='cap bad'>red</span> chip is a blocker to resolve before that wave.</div>
+        $body = (@($rrows) | ForEach-Object {
+            $usedLimit = if ($_.Limit -gt 0) { "$($_.Used) / $($_.Limit)" } else { '-' }
+            $freeCell  = if ($_.Limit -gt 0) { "<b>$($_.Free)</b>" } else { '-' }
+            $after     = if ($_.Quota -in @('OK','Shortfall')) {
+                $h = $_.Free - $_.VCpusNeeded
+                if ($h -lt 0) { "<span class='cap bad'>$h</span>" } else { "$h" }
+            } else { '-' }
+            $needCell  = if ($_.VCpusNeeded -gt 0) { $_.VCpusNeeded } else { '-' }
+            "<tr><td class='mono'>$($_.Target)</td><td>$($_.Family)</td><td class='num'>$($_.VmCount)</td><td class='num'>$needCell</td><td class='num'>$usedLimit</td><td class='num'>$freeCell</td><td class='num'>$after</td><td><span class='cap $($_.VerdictClass)'>$($_.Verdict)</span><div class='cap-d'>$($_.QuotaDetail)$($_.AvailDetail)</div></td></tr>"
+        }) -join "`n"
+        if (-not $body) { $body = "<tr><td colspan='8'>No candidates in this region.</td></tr>" }
+
+        $regionSections += @"
+ <div class='cap-region'>$region &nbsp; $badge</div>
  <table>
-  <thead><tr><th>Target size</th><th>Region</th><th>VMs</th><th>Availability</th><th>Quota</th></tr></thead>
+  <thead><tr><th>Target size</th><th>Family</th><th>VMs</th><th>vCPUs needed</th><th>Used / Limit</th><th>Free</th><th>Headroom after</th><th>Verdict</th></tr></thead>
   <tbody>
-  $targetRows
+  $body
   </tbody>
  </table>
+"@
+    }
+    if (-not $regionSections) { $regionSections = "<div class='legend'>No modernization candidates to check.</div>" }
+
+    # --- Section C: compute-family headroom matrix ---------------------------------
+    $matrixRows = (@($QuotaMatrix) | ForEach-Object {
+        $cls = if ($_.UsedPct -ge 90) { 'bad' } elseif ($_.UsedPct -ge 70) { 'warn' } else { 'ok' }
+        $needCell = if ($_.Needed -gt 0) { "<b>$($_.Needed)</b>" } else { '-' }
+        "<tr><td class='mono'>$($_.Region)</td><td>$($_.Family)</td><td class='num'>$($_.Used)</td><td class='num'>$($_.Limit)</td><td class='num'><b>$($_.Free)</b></td><td class='num'>$needCell</td><td class='num'><span class='cap $cls'>$($_.UsedPct)%</span></td></tr>"
+    }) -join "`n"
+    if (-not $matrixRows) { $matrixRows = "<tr><td colspan='7'>No compute vCPU quota data returned.</td></tr>" }
+
+    @"
+$cards
+ <div class='note cap-warn'><b>Read this first.</b> "Ready" means the target SKU is offered to
+ your subscription and you have vCPU headroom for the wave. It does <b>not</b> guarantee live
+ datacenter capacity at deploy time. In capacity-constrained regions (for example Canada),
+ confirm the wave with the Azure capacity team before committing. This view is read-only.</div>
+
+ <h2>Can I land my modernization? (by region)</h2>
+ <div class='legend'>Grouped by region, then target family. "vCPUs needed" is the whole wave
+ (VMs &times; target vCPUs). A <span class='cap bad'>red</span> verdict is a blocker to resolve
+ before that wave, and "Request quota (+N cores)" is the exact increase to file.</div>
+$regionSections
 
  <h2>Region capacity - vCPU quota by family</h2>
- <div class='legend'>Headroom in every region you use today. Answers "what can I actually deploy here"
- independent of modernization.</div>
+ <div class='legend'>Headroom in every region you use today, compute families only. Answers
+ "what can I actually deploy here" independent of modernization. "Needed now" is what this
+ migration would consume from that family.</div>
  <table>
-  <thead><tr><th>Region</th><th>VM family</th><th>Used</th><th>Limit</th><th>Free</th><th>Used %</th></tr></thead>
+  <thead><tr><th>Region</th><th>VM family</th><th>Used</th><th>Limit</th><th>Free</th><th>Needed now</th><th>Used %</th></tr></thead>
   <tbody>
   $matrixRows
   </tbody>
@@ -338,6 +441,8 @@ function Get-CapacityCss {
  .cap.unk{background:#edebe9;color:#605e5c}
  .cap-d{font-size:11px;color:#605e5c;margin-top:2px}
  .cap-warn{border-left-color:#a4262c !important;background:#fff5f5 !important}
+ .cap-region{font-weight:600;font-size:15px;margin:20px 0 6px;color:#323130;border-left:3px solid #0078d4;padding-left:8px}
+ .cap-num-bad{color:#a4262c}
  td.num{text-align:right;font-variant-numeric:tabular-nums}
 </style>
 "@

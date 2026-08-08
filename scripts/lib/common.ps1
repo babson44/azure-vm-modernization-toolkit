@@ -279,7 +279,14 @@ function Get-ReportCss {
 function Get-AssessmentBodyHtml {
     # Returns the inner HTML for the assessment view (cards, per-subscription rollup,
     # full VM table). Shared by both the assessment page and the combined page.
-    param([object[]] $Rows)
+    # When -TargetLookup is supplied (combined report only), each VM also gets a
+    # "Target available?" chip linking the assessment to the capacity verdict.
+    param(
+        [object[]]  $Rows,
+        [hashtable] $TargetLookup
+    )
+
+    $showAvail = ($null -ne $TargetLookup)
 
     $total      = $Rows.Count
     $candidates = @($Rows | Where-Object { $_.Track -notin @('NONE') }).Count
@@ -318,12 +325,22 @@ function Get-AssessmentBodyHtml {
         }
         $flags = if ($_.ReviewFlags) { "<span class='flag'>$($_.ReviewFlags)</span>" } else { '' }
         $sav   = if ($_.Track -notin @('NONE') -and $_.EstSavingsPct) { "~$($_.EstSavingsPct)%" } else { '-' }
+        $availCell = ''
+        if ($showAvail) {
+            if ($TargetLookup.ContainsKey($_.Name)) {
+                $tc = $TargetLookup[$_.Name]
+                $availCell = "<td><span class='cap $($tc.VerdictClass)'>$($tc.Verdict)</span></td>"
+            }
+            else {
+                $availCell = "<td><span class='cap unk'>-</span></td>"
+            }
+        }
         @"
 <tr class='$cls'>
   <td>$($_.Name)</td><td>$($_.OsType)</td><td>$($_.CurrentSize)</td>
   <td>$($_.Series)</td><td>$($_.Generation)</td>
   <td><b>$($_.Track)</b> $($_.TrackName)</td>
-  <td>$($_.Target)</td><td class='sav'>$sav</td><td>$($_.Prerequisites) $flags</td>
+  <td>$($_.Target)</td>$availCell<td class='sav'>$sav</td><td>$($_.Prerequisites) $flags</td>
   <td>$($_.Location)</td>
 </tr>
 "@
@@ -358,7 +375,7 @@ function Get-AssessmentBodyHtml {
  <table>
   <thead><tr>
    <th>VM</th><th>OS</th><th>Current size</th><th>Series</th><th>Gen</th>
-   <th>Track</th><th>Recommended target</th><th>Est. save</th><th>Prerequisites / flags</th><th>Region</th>
+   <th>Track</th><th>Recommended target</th>$(if ($showAvail) { '<th>Target available?</th>' })<th>Est. save</th><th>Prerequisites / flags</th><th>Region</th>
   </tr></thead>
   <tbody>
   $bodyRows
@@ -499,8 +516,9 @@ function Get-PlanBodyHtml {
 }
 
 function New-PlanHtmlReport {
-    # Writes a single page with two tabs: the assessment (all scanned VMs) and the
-    # wave plan. No external assets, so it renders fine after a browser download.
+    # Writes a single page with up to three tabs: the assessment (all scanned VMs), the
+    # wave plan, and (when capacity data is supplied) capacity & quota. No external
+    # assets, so it renders fine after a browser download.
     param(
         [object[]] $Rows,
         [object[]] $Pilot,
@@ -508,12 +526,15 @@ function New-PlanHtmlReport {
         [object[]] $Wave2,
         [object[]] $Review,
         [string]   $Path,
-        [object]   $Account
+        [object]   $Account,
+        [hashtable] $TargetLookup,
+        [string]   $CapacityBody,
+        [string]   $CapacityCss
     )
 
     $gen   = (Get-Date).ToString('u')
     $css   = Get-ReportCss
-    $aBody = Get-AssessmentBodyHtml -Rows $Rows
+    $aBody = Get-AssessmentBodyHtml -Rows $Rows -TargetLookup $TargetLookup
     $pBody = Get-PlanBodyHtml -Rows $Rows -Pilot $Pilot -Wave1 $Wave1 -Wave2 $Wave2 -Review $Review
     $meta  = if ($Account) {
         "Generated $gen &nbsp;|&nbsp; Tenant $($Account.tenantId) &nbsp;|&nbsp; Read-only, no changes were made"
@@ -522,10 +543,16 @@ function New-PlanHtmlReport {
         "Generated $gen &nbsp;|&nbsp; Read-only, no changes were made"
     }
 
+    $hasCap      = -not [string]::IsNullOrWhiteSpace($CapacityBody)
+    $capCssBlock = if ($hasCap) { $CapacityCss } else { '' }
+    $capTab      = if ($hasCap) { "<div class='tab' onclick=""showTab('tab-cap',this)"">Capacity &amp; quota</div>" } else { '' }
+    $capPanel    = if ($hasCap) { "<div id='tab-cap' class='panel'>`n$CapacityBody`n </div>" } else { '' }
+
     $html = @"
 <!doctype html><html><head><meta charset='utf-8'>
 <title>Azure VM Modernization - Assessment and Plan</title>
-$css</head><body>
+$css
+$capCssBlock</head><body>
 <header>
  <h1>Azure VM Modernization - Assessment &amp; Plan</h1>
  <p>$meta</p>
@@ -533,6 +560,7 @@ $css</head><body>
 <div class='tabs'>
  <div class='tab active' onclick="showTab('tab-assess',this)">Assessment</div>
  <div class='tab' onclick="showTab('tab-plan',this)">Wave plan</div>
+ $capTab
 </div>
 <div class='wrap'>
  <div id='tab-assess' class='panel active'>
@@ -541,6 +569,7 @@ $aBody
  <div id='tab-plan' class='panel'>
 $pBody
  </div>
+ $capPanel
 </div>
 <script>
 function showTab(id, btn){
@@ -567,13 +596,29 @@ function Test-CloudShell {
     return $false
 }
 
+function Get-FreePort {
+    # Returns the first bindable TCP port at or after $Preferred, so -Serve never crashes
+    # with "Address already in use" when a previous preview server is still holding 8080.
+    param([int] $Preferred = 8080, [int] $Attempts = 25)
+    for ($p = $Preferred; $p -lt ($Preferred + $Attempts); $p++) {
+        try {
+            $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $p)
+            $listener.Start()
+            $listener.Stop()
+            return $p
+        }
+        catch { continue }
+    }
+    return $Preferred
+}
+
 function Show-ReportAccess {
     <#
         Makes the finished report effortless to view, so a non-technical customer does
         nothing extra:
           - In Cloud Shell it auto-triggers the browser download of the HTML report.
-          - With -Serve it starts a tiny local web server so the report opens fully
-            rendered through the Cloud Shell "Web preview" button (a clickable page).
+          - With -Serve it then starts a tiny local web server (on the first free port)
+            so the report opens fully rendered through the Cloud Shell "Web preview" button.
         It always prints copy-paste fallbacks so no one is ever stuck.
         This function is read-only and never changes anything in Azure.
     #>
@@ -589,28 +634,8 @@ function Show-ReportAccess {
     $htmlName = Split-Path $HtmlPath -Leaf
     $dir      = Split-Path $HtmlPath -Parent
 
-    # Option 1: live, clickable, rendered page via Web preview.
-    if ($Serve) {
-        $py = Get-Command python3 -ErrorAction SilentlyContinue
-        if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
-        if (-not $py) {
-            Write-Host "Cannot serve: python is not available here. Use the download options below instead." -ForegroundColor Yellow
-        }
-        else {
-            Write-Host ""
-            Write-Host "Serving your report for in-browser viewing..." -ForegroundColor Cyan
-            Write-Host ("  1. In the Cloud Shell toolbar, click 'Web preview' and choose port {0}." -f $Port) -ForegroundColor Cyan
-            Write-Host ("  2. On the page that opens, click '{0}' to view the report." -f $htmlName) -ForegroundColor Cyan
-            Write-Host "  3. Press Ctrl+C here when you are done to stop the server." -ForegroundColor DarkGray
-            Write-Host ""
-            Push-Location $dir
-            try { & $py.Source '-m' 'http.server' "$Port" }
-            finally { Pop-Location }
-            return
-        }
-    }
-
-    # Option 2: auto-download the HTML straight to the browser (Cloud Shell only).
+    # Option 1 (always first): hand the finished HTML straight to the browser download, so
+    # the customer keeps the file even if they never click Web preview or stop the server.
     if ($inCloudShell -and -not $NoDownload) {
         try {
             Write-Host ""
@@ -620,6 +645,31 @@ function Show-ReportAccess {
         }
         catch {
             Write-Host "Auto-download did not trigger. Use the manual command below." -ForegroundColor Yellow
+        }
+    }
+
+    # Option 2 (optional): also serve a live, clickable, rendered page via Web preview.
+    if ($Serve) {
+        $py = Get-Command python3 -ErrorAction SilentlyContinue
+        if (-not $py) { $py = Get-Command python -ErrorAction SilentlyContinue }
+        if (-not $py) {
+            Write-Host "Cannot serve: python is not available here. Use the download options below instead." -ForegroundColor Yellow
+        }
+        else {
+            $servePort = Get-FreePort -Preferred $Port
+            if ($servePort -ne $Port) {
+                Write-Host ("Port {0} was busy, serving on {1} instead." -f $Port, $servePort) -ForegroundColor Yellow
+            }
+            Write-Host ""
+            Write-Host "Serving your report for in-browser viewing..." -ForegroundColor Cyan
+            Write-Host ("  1. In the Cloud Shell toolbar, click 'Web preview' and choose port {0}." -f $servePort) -ForegroundColor Cyan
+            Write-Host ("  2. On the page that opens, click '{0}' to view the report." -f $htmlName) -ForegroundColor Cyan
+            Write-Host "  3. Press Ctrl+C here when you are done to stop the server." -ForegroundColor DarkGray
+            Write-Host ""
+            Push-Location $dir
+            try { & $py.Source '-m' 'http.server' "$servePort" }
+            finally { Pop-Location }
+            return
         }
     }
 
