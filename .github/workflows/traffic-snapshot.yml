@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: write           # needed to commit the updated CSVs
+  administration: read      # needed to read repo Traffic (views + clones)
 
 jobs:
   snapshot:
