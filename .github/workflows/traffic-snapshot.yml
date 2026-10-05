@@ -11,7 +11,9 @@ on:
 
 permissions:
   contents: write           # needed to commit the updated CSVs
-  administration: read      # needed to read repo Traffic (views + clones)
+  # NOTE: the Traffic API needs push/admin access, which the built-in GITHUB_TOKEN
+  # cannot be granted via this block. Instead we read Traffic with the TRAFFIC_TOKEN
+  # secret (a PAT with Administration:read) set on the repo; see GH_TOKEN below.
 
 jobs:
   snapshot:
