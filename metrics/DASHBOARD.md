@@ -1,6 +1,6 @@
 # Toolkit Usage Dashboard
 
-_Auto-generated 2026-10-20 by the Traffic snapshot workflow. History: 2026-09-21 to 2026-10-19._
+_Auto-generated 2026-10-21 by the Traffic snapshot workflow. History: 2026-09-21 to 2026-10-19._
 
 > **How to read this:** _Clones_ are downloads that run the toolkit (each is a git checkout). _Views_ are page visits. GitHub Traffic is anonymous, so these are counts only, never usernames. A few clones each day come from this repo's own automation, not people.
 
