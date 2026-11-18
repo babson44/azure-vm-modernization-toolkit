@@ -1,6 +1,6 @@
 # Toolkit Usage Dashboard
 
-_Auto-generated 2026-11-17 by the Traffic snapshot workflow. History: 2026-09-21 to 2026-11-16._
+_Auto-generated 2026-11-18 by the Traffic snapshot workflow. History: 2026-09-21 to 2026-11-17._
 
 > **How to read this:** _Clones_ are downloads that run the toolkit (each is a git checkout). _Views_ are page visits. GitHub Traffic is anonymous, so these are counts only, never usernames. A few clones each day come from this repo's own automation, not people.
 
@@ -8,9 +8,9 @@ _Auto-generated 2026-11-17 by the Traffic snapshot workflow. History: 2026-09-21
 
 | Metric | Views | Clones |
 |---|---:|---:|
-| Total (all history) | 376 | 617 |
-| Last 7 days | 23 | 94 |
-| Daily average | 6.6 | 10.8 |
+| Total (all history) | 376 | 618 |
+| Last 7 days | 22 | 90 |
+| Daily average | 6.5 | 10.7 |
 | Busiest day | 2026-09-24 (91) | 2026-10-11 (39) |
 
 ## Daily views
@@ -18,10 +18,10 @@ _Auto-generated 2026-11-17 by the Traffic snapshot workflow. History: 2026-09-21
 ```mermaid
 xychart-beta
     title "Daily views (bar) and unique visitors (line)"
-    x-axis [10-18, 10-19, 10-20, 10-21, 10-22, 10-23, 10-24, 10-25, 10-26, 10-27, 10-28, 10-29, 10-30, 10-31, 11-01, 11-02, 11-03, 11-04, 11-05, 11-06, 11-07, 11-08, 11-09, 11-10, 11-11, 11-12, 11-13, 11-14, 11-15, 11-16]
+    x-axis [10-19, 10-20, 10-21, 10-22, 10-23, 10-24, 10-25, 10-26, 10-27, 10-28, 10-29, 10-30, 10-31, 11-01, 11-02, 11-03, 11-04, 11-05, 11-06, 11-07, 11-08, 11-09, 11-10, 11-11, 11-12, 11-13, 11-14, 11-15, 11-16, 11-17]
     y-axis "Visitors" 0 --> 12
-    bar [1, 3, 1, 0, 0, 2, 0, 1, 10, 2, 1, 6, 5, 0, 0, 8, 12, 2, 8, 1, 0, 0, 3, 1, 10, 3, 2, 2, 2, 3]
-    line [1, 2, 1, 0, 0, 2, 0, 1, 6, 2, 1, 3, 4, 0, 0, 5, 2, 1, 5, 1, 0, 0, 2, 1, 2, 3, 2, 2, 2, 3]
+    bar [3, 1, 0, 0, 2, 0, 1, 10, 2, 1, 6, 5, 0, 0, 8, 12, 2, 8, 1, 0, 0, 3, 1, 10, 3, 2, 2, 2, 3, 0]
+    line [2, 1, 0, 0, 2, 0, 1, 6, 2, 1, 3, 4, 0, 0, 5, 2, 1, 5, 1, 0, 0, 2, 1, 2, 3, 2, 2, 2, 3, 0]
 ```
 
 ## Daily clones
@@ -29,17 +29,16 @@ xychart-beta
 ```mermaid
 xychart-beta
     title "Daily clones (bar) and unique cloners (line)"
-    x-axis [10-18, 10-19, 10-20, 10-21, 10-22, 10-23, 10-24, 10-25, 10-26, 10-27, 10-28, 10-29, 10-30, 10-31, 11-01, 11-02, 11-03, 11-04, 11-05, 11-06, 11-07, 11-08, 11-09, 11-10, 11-11, 11-12, 11-13, 11-14, 11-15, 11-16]
+    x-axis [10-19, 10-20, 10-21, 10-22, 10-23, 10-24, 10-25, 10-26, 10-27, 10-28, 10-29, 10-30, 10-31, 11-01, 11-02, 11-03, 11-04, 11-05, 11-06, 11-07, 11-08, 11-09, 11-10, 11-11, 11-12, 11-13, 11-14, 11-15, 11-16, 11-17]
     y-axis "Clones" 0 --> 31
-    bar [6, 27, 7, 17, 31, 16, 6, 4, 5, 19, 6, 14, 6, 16, 5, 5, 14, 5, 14, 16, 18, 9, 6, 5, 15, 13, 14, 14, 19, 14]
-    line [4, 14, 3, 9, 17, 10, 4, 2, 3, 10, 4, 7, 4, 9, 3, 3, 8, 3, 7, 9, 10, 5, 3, 3, 9, 8, 10, 9, 12, 10]
+    bar [27, 7, 17, 31, 16, 6, 4, 5, 19, 6, 14, 6, 16, 5, 5, 14, 5, 14, 16, 18, 9, 6, 5, 15, 13, 14, 14, 19, 14, 1]
+    line [14, 3, 9, 17, 10, 4, 2, 3, 10, 4, 7, 4, 9, 3, 3, 8, 3, 7, 9, 10, 5, 3, 3, 9, 8, 10, 9, 12, 10, 1]
 ```
 
 ## Recent activity (last 14 days)
 
 | Date | Views | Unique visitors | Clones | Unique cloners |
 |---|---:|---:|---:|---:|
-| 2026-11-03 | 12 | 2 | 14 | 8 |
 | 2026-11-04 | 2 | 1 | 5 | 3 |
 | 2026-11-05 | 8 | 5 | 14 | 7 |
 | 2026-11-06 | 1 | 1 | 16 | 9 |
@@ -53,6 +52,7 @@ xychart-beta
 | 2026-11-14 | 2 | 2 | 14 | 9 |
 | 2026-11-15 | 2 | 2 | 19 | 12 |
 | 2026-11-16 | 3 | 3 | 14 | 10 |
+| 2026-11-17 | 0 | 0 | 1 | 1 |
 
 ---
 _Source: GitHub repository Traffic API. Raw history lives in `metrics/traffic-views.csv` and `metrics/traffic-clones.csv`._
